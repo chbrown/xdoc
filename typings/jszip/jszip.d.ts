@@ -32,7 +32,7 @@ interface JSZip {
 
     /**
      * Return an new JSZip instance with the given folder as root
-     *
+     * 
      * @param name Name of the folder
      * @return New JSZip object with the given folder as root or null
      */
@@ -40,7 +40,7 @@ interface JSZip {
 
     /**
      * Returns new JSZip instances with the matching folders as root
-     *
+     * 
      * @param name RegExp to match
      * @return New array of JSZipFile objects which match the RegExp
      */
@@ -56,7 +56,7 @@ interface JSZip {
 
     /**
      * Removes the file or folder from the archive
-     *
+     * 
      * @param path Relative path of file or folder
      * @return Returns the JSZip instance
      */
@@ -140,36 +140,37 @@ interface JSZipSupport {
     nodebuffer: boolean;
 }
 
+declare var JSZip: {
+    /**
+     * Create JSZip instance
+     */
+    (): JSZip;
+    /**
+     * Create JSZip instance
+     * If no parameters given an empty zip archive will be created
+     *
+     * @param data Serialized zip archive
+     * @param options Description of the serialized zip archive
+     */
+    (data: any, options?: JSZipLoadOptions): JSZip;
+
+    /**
+     * Create JSZip instance
+     */
+    new (): JSZip;
+    /**
+     * Create JSZip instance
+     * If no parameters given an empty zip archive will be created
+     *
+     * @param data Serialized zip archive
+     * @param options Description of the serialized zip archive
+     */
+    new (data: any, options?: JSZipLoadOptions): JSZip;
+
+    prototype: JSZip;
+    support: JSZipSupport;
+}
+
 declare module "jszip" {
-    var JSZip:{
-        /**
-         * Create JSZip instance
-         */
-        (): JSZip;
-        /**
-         * Create JSZip instance
-         * If no parameters given an empty zip archive will be created
-         *
-         * @param data Serialized zip archive
-         * @param options Description of the serialized zip archive
-         */
-        (data:any, options?:JSZipLoadOptions): JSZip;
-
-        /**
-         * Create JSZip instance
-         */
-        new (): JSZip;
-        /**
-         * Create JSZip instance
-         * If no parameters given an empty zip archive will be created
-         *
-         * @param data Serialized zip archive
-         * @param options Description of the serialized zip archive
-         */
-        new (data:any, options?:JSZipLoadOptions): JSZip;
-
-        prototype: JSZip;
-        support: JSZipSupport;
-    };
     export = JSZip;
 }
