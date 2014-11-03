@@ -1,0 +1,34 @@
+{
+  "name": "xdoc",
+  "version": "0.2.0",
+  "description": "Document object manipulation",
+  "keywords": [
+    "word",
+    "docx",
+    "tex",
+    "dom"
+  ],
+  "homepage": "https://chbrown.github.io/xdoc",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/chbrown/xdoc.git"
+  },
+  "bugs": {
+    "url": "https://github.com/chbrown/xdoc/issues"
+  },
+  "author": "Christopher Brown",
+  "license": "MIT",
+  "dependencies": {
+    "tex": "*"
+  },
+  "staticPattern": "static/lib/{file}",
+  "staticDependencies": {
+    "angular": "*",
+    "angular-ui-router": "*",
+    "lo-dash": "*",
+    "ng-storage": "*",
+    "jquery": "*",
+    "requirejs": "*",
+    "misc-js": "git://github.com/chbrown/misc-js.git"
+  }
+}

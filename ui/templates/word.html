@@ -1,0 +1,37 @@
+<div ng-controller="wordCtrl">
+  <section class="hpad">
+    <form>
+      <label>
+        <div><b>Upload Word Doc</b></div>
+        <input type="file">
+      </label>
+    </form>
+  </section>
+
+  <section class="hpad">
+    <div><b>Stored file:</b></div>
+    <ul>
+      <li>Modified: {{$storage.file.lastModifiedDate | date:'MMMM d, y h:mm a'}}</li>
+      <li>Filename: {{$storage.file.name}}</li>
+      <li>Size: {{$storage.file.size}}</li>
+      <li>MIME Type: {{$storage.file.type}}</li>
+      <li>ArrayBuffer.byteLength: {{$storage.file.arraybuffer.byteLength}}</li>
+    </ul>
+  </section>
+
+  <hr>
+
+  <section class="hpad">
+    <h2>Document Metadata</h2>
+    <ul>
+      <li ng-repeat="(key, value) in document.metadata">{{key}}: {{value}}</li>
+    </ul>
+  </section>
+
+  <section class="hpad">
+    <h2>Document</h2>
+
+    <div class="document" id="document_placeholder"></div>
+  </section>
+
+</div>
