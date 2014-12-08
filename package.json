@@ -25,10 +25,10 @@
   "staticDependencies": {
     "angular": "*",
     "angular-ui-router": "*",
-    "lo-dash": "*",
-    "ng-storage": "*",
     "jquery": "*",
-    "requirejs": "*",
-    "misc-js": "git://github.com/chbrown/misc-js.git"
+    "lo-dash": "*",
+    "misc-js": "git://github.com/chbrown/misc-js.git",
+    "ng-storage": "*",
+    "requirejs": "*"
   }
 }
