@@ -1,10 +1,42 @@
+// --- general resets ---
+body {
+  margin: 0;
+}
+table {
+  border-spacing: 0;
+  border-collapse: collapse;
+  th, td {
+    font-size: 100%;
+    text-align: left;
+  }
+}
+// ----------------------
+// --- generic compact ---
+h1, h2, h3, h4, h5, h6 {
+  margin: 1ex 0;
+}
+div, section, nav, main, textarea, input, span {
+  box-sizing: border-box;
+}
+section {
+  margin-top: 5px;
+  margin-bottom: 5px;
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+.vpad {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+.hpad {
+  padding-left: 10px;
+  padding-right: 10px;
+}
+// -----------------------
+
 body {
   background-color: white;
-  margin: 0;
-  font-family: "Lucida Grande", Arial, sans-serif;
-}
-input, select, button {
-  margin: 0;
+  font: 14px "Lucida Grande", Arial, sans-serif;
 }
 label[disabled] {
   color: #777;
@@ -16,35 +48,38 @@ fieldset {
 code, .code {
   font-family: monospace;
 }
+.help {
+  font-size: 80%;
+  color: #444;
+  cursor: pointer;
+}
+table {
+  td, th {
+    padding: 1px 4px 2px 2px;
+    vertical-align: top;
+  }
+}
 
-nav {
+nav[fixedflow] {
   left: 0;
   right: 0;
   z-index: 100;
-  font-size: 75%;
+  font-size: 90%;
+  background-color: #999;
+  padding: 0 5px;
 
-  span, a, button, img, select {
+  .tab {
     display: inline-block;
-    vertical-align: middle;
-    margin: 3px 0 0 0;
-  }
-  span, a, button.anchor {
     padding: 2px 6px;
+    // padding: 1px 5px 2px;
+    margin: 3px 0 0 0;
     border-radius: 2px 2px 0 0;
-  }
-  a, button.anchor {
+    // coloring:
     background-color: #DDD;
     &:hover, &.current {
       background-color: #FDFDFD;
     }
   }
-
-  background-color: #999;
-  padding: 0 5px;
-}
-
-main {
-  padding: 10px;
 }
 
 .wrap {
@@ -60,9 +95,6 @@ main {
   white-space: pre-wrap;
 }
 
-.help {
-  color: #444;
-}
 .delete {
   cursor: pointer;
   text-decoration: line-through;
@@ -80,33 +112,6 @@ main {
 
 .focus {
   box-shadow: 0 0 6px rgba(81, 203, 238, 1);
-}
-
-section {
-  margin-top: 10px;
-  margin-bottom: 10px;
-}
-.hpad {
-  margin-left: 10px;
-  margin-right: 10px;
-  font-size: 95%;
-}
-.help {
-  font-size: 80%;
-  cursor: pointer;
-}
-
-table {
-  border-collapse: collapse;
-  th {
-    text-align: left;
-  }
-  td, th {
-    padding: 1px 4px 2px 2px;
-  }
-  td {
-    vertical-align: top;
-  }
 }
 
 table.map {
@@ -152,17 +157,5 @@ table.map {
   }
   .endnote {
     color: green;
-  }
-}
-
-.flag {
-  position: absolute;
-  background-color: black;
-  border-radius: 3px;
-  padding: 2px 6px;
-  color: white;
-  .triangle {
-    position: absolute;
-    border: 6px solid transparent;
   }
 }

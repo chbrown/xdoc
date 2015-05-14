@@ -1,4 +1,3 @@
-/*globals module, window, Uint8Array, ArrayBuffer */
 var base64_chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
 // function encodeArrayBuffer(arraybuffer) {

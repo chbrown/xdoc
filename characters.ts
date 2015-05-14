@@ -418,4 +418,3 @@ export var wingdings = {
   254: '☑',
   255: '(Windows logo – no equivalent)',
 };
-

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<head>
+  <meta charset="utf-8">
+  <title>xdoc</title>
+  <link href="site.css" rel="stylesheet" type="text/css">
+  <link href="../favicon.ico" rel="icon" type="image/x-icon">
+  <!-- angular libraries -->
+  <script src="build/angular.min.js"></script>
+  <script src="build/angular-ui-router.min.js"></script>
+  <script src="build/ngStorage.min.js"></script>
+  <!-- misc-js angular library -->
+  <script src="build/angular-plugins.js"></script>
+  <!-- main app -->
+  <script src="build/bundle.js"></script>
+</head>
+<body ng-app="app">
+  <flash></flash>
+  <nav fixedflow>
+    <span ui-sref-active="current" class="tab">
+      <a ui-sref="word">Word</a>
+    </span>
+    <!-- <span ui-sref-active="current" class="tab">
+      <a ui-sref="validate">Validate</a>
+    </span> -->
+  </nav>
+  <main ui-view></main>
+</body>

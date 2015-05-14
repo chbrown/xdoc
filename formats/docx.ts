@@ -1,107 +1,74 @@
-/// <reference path="../typings/tsd.d.ts" />
+/// <reference path="../type_declarations/index.d.ts" />
 
-/** This module should be used for parsing Microsoft OpenXML documents.
+/**
+This module should be used for parsing Microsoft OpenXML documents.
 
- This is the part that needs to worry about the difference between w:p and w:r
-
- jslint browser: true
- */
+This is the part that needs to worry about the difference between w:p and w:r
+*/
 
 import JSZip = require('jszip');
-//import _ = require('lodash');
-import ds = require('../datastructures');
+import adts = require('adts');
 import xdom = require('../xdom');
 import characters = require('../characters');
-
-
-//interface FixedElement extends Element {
-//  children: HTMLCollection;
-//}
-//var Element: {
-//  prototype: FixedElement;
-//  new(): FixedElement;
-//};
-
-
-//function childElements(node: Node): Array<Element> {
-//  var elements: Array<Element> = [];
-//  for (var i = 0, childNode; (childNode = node.childNodes[i]); i++) {
-//    if (childNode.nodeType == Node.ELEMENT_NODE) {
-//      elements.push(childNode);
-//    }
-//  }
-//  return elements;
-//}
+import {log} from '../util';
 
 function eachChildElement(node: Node, func: (element: Element) => void) {
-  // this shouldn't work, but TypeScript lets it because the childNode erases the type
-  for (var i = 0, childNode; (childNode = node.childNodes[i]); i++) {
+  for (var i = 0, childNode: Node; (childNode = node.childNodes[i]); i++) {
     if (childNode.nodeType == Node.ELEMENT_NODE) {
-      func(childNode);
+      var element = <Element>childNode;
+      func(element);
     }
   }
-  //_.each(node.childNodes, function(childNode) {
-  //  if (childNode.nodeType == Node.ELEMENT_NODE) {
-  //    func(childNode);
-  //  }
-  //});
 }
 
-interface Map<K extends string, V> { [index: string]: V }
-var log = console.log.bind(console);
-
 class Context {
-  footnotes: Map<string, xdom.XFootnote>;
-  endnotes: Map<string, xdom.XEndnote>;
-  style_stack: Array<ds.Set>;
-
-  constructor(footnotes: Map<string, xdom.XFootnote> = {}, endnotes: Map<string, xdom.XEndnote> = {}) {
-    this.footnotes = footnotes;
-    this.endnotes = endnotes;
-    this.style_stack = [new ds.Set()];
-  }
-  pushStyles(styles: Array<string> = []): void {
-    this.style_stack.push(new ds.Set(styles));
+  constructor(public footnotes: Map<xdom.XFootnote> = {},
+              public endnotes: Map<xdom.XEndnote> = {},
+              public style_stack: adts.Set[] = [new adts.Set()]) { }
+  pushStyles(styles: string[] = []): void {
+    this.style_stack.push(new adts.Set(styles));
   }
   popStyles() {
     return this.style_stack.pop();
   }
-  setStyles(styles: ds.Set): void {
+  setStyles(styles: adts.Set): void {
     this.style_stack[this.style_stack.length - 1] = styles;
   }
-  addStyles(styles: Array<string>): void {
+  addStyles(styles: string[]): void {
     var top = this.style_stack[this.style_stack.length - 1];
-    this.setStyles(ds.Set.union([top, new ds.Set(styles)]));
+    this.setStyles(adts.Set.union([top, new adts.Set(styles)]));
   }
   currentStyles() {
     /** Returns set (as instance of S) */
-    return ds.Set.union(this.style_stack);
+    return adts.Set.union(this.style_stack);
   }
 }
 
+/**
+parseXML takes an XML string and returns a DOM Level 2/3 Document:
+https://developer.mozilla.org/en-US/docs/Web/API/document
+Uses the XML mode of the built-in DOMParser:
+https://developer.mozilla.org/en-US/docs/Web/API/DOMParser
+*/
 function parseXML(xml: string): Document {
-  /** parseXML takes an XML string and returns a DOM Level 2/3 Document:
-   https://developer.mozilla.org/en-US/docs/Web/API/document
-   Uses the XML mode of the built-in DOMParser:
-   https://developer.mozilla.org/en-US/docs/Web/API/DOMParser
-   */
   return new DOMParser().parseFromString(xml, 'application/xml');
 }
 
-function dropNS(qualifiedName: string) {
-  /** Helper function (not exported) to drop the namespace part of a fully
-  qualified name, e.g.:
+/**
+Drop the namespace part of a fully qualified name, e.g.:
 
-      dropNS('w:r') -> 'r'
-      dropNS('br') -> 'br'
-  */
+    dropNS('w:r') -> 'r'
+    dropNS('br') -> 'br'
+*/
+function dropNS(qualifiedName: string) {
   return qualifiedName.replace(/^.+:/, '');
 }
 
-function readFootnotes(document: Document): Map<string, xdom.XFootnote> {
-  /** Read the footnotes for a DocX document */
-  var notes: Map<string, xdom.XFootnote> = {};
-  _.each(document.documentElement.children, function(note) {
+/** Read the footnotes for a DocX document */
+function readFootnotes(document: Document): Map<xdom.XFootnote> {
+  var notes: Map<xdom.XFootnote> = {};
+  document.documentElement
+  eachChildElement(document.documentElement, note => {
     var id = note.getAttribute('w:id');
     // each w:footnote has a bunch of w:p children, like a w:body
     var context = new Context();
@@ -111,10 +78,10 @@ function readFootnotes(document: Document): Map<string, xdom.XFootnote> {
   return notes;
 }
 
-function readEndnotes(document: Document): Map<string, xdom.XEndnote> {
-  /** Read the endnotes for a DocX document */
-  var notes: Map<string, xdom.XEndnote> = {};
-  _.each(document.documentElement.children, function(note) {
+/** Read the endnotes for a DocX document */
+function readEndnotes(document: Document): Map<xdom.XEndnote> {
+  var notes: Map<xdom.XEndnote> = {};
+  eachChildElement(document.documentElement, note => {
     var id = note.getAttribute('w:id');
     // each w:endnote has a bunch of w:p children, like a w:body
     var context = new Context();
@@ -124,50 +91,52 @@ function readEndnotes(document: Document): Map<string, xdom.XEndnote> {
   return notes;
 }
 
-function readMetadata(core_document: Document): Map<string, string> {
-  /** Turns the simple docProps/core.xml format into a key-value mapping after
-  dropping namespaces. core_document should be a DOM Document; returns a plan
-  Javascript hash object.
-  */
-  var metadata: Map<string, string> = {};
-  _.each(core_document.documentElement.children, function(child) {
+/**
+Turns the simple docProps/core.xml format into a key-value mapping after
+dropping namespaces. core_document should be a DOM Document; returns a plan
+Javascript hash object.
+*/
+function readMetadata(core_document: Document): Map<string> {
+  var metadata: Map<string> = {};
+  eachChildElement(core_document.documentElement, child => {
     var tag = dropNS(child.tagName);
     metadata[tag] = child.textContent;
   });
   return metadata;
 }
 
-function readRelationships(relationships_document: Document): Map<string, string> {
-  /** The word/_rels/document.xml.rels looks kind of like:
+/**
+The word/_rels/document.xml.rels looks kind of like:
 
-  <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-    <Relationship Id="rId1"
-      Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml"
-      Target="../customXml/item1.xml"/>
-    ...
-    <Relationship Id="rId13"
-      Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink"
-      Target="http://dx.doi.org/10.1007/s11049-011-9137-1%20%20" TargetMode="External"/>
-  </Relationships>
-
-  */
-  var relationships: Map<string, string> = {};
-  _.each(relationships_document.documentElement.children, function(child) {
+    <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+      <Relationship Id="rId1"
+        Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml"
+        Target="../customXml/item1.xml"/>
+      ...
+      <Relationship Id="rId13"
+        Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink"
+        Target="http://dx.doi.org/10.1007/s11049-011-9137-1%20%20" TargetMode="External"/>
+    </Relationships>
+*/
+function readRelationships(relationships_document: Document): Map<string> {
+  var relationships: Map<string> = {};
+  eachChildElement(relationships_document.documentElement, child => {
     var id = child.getAttribute('Id');
     relationships[id] = child.getAttribute('Target');
   });
   return relationships;
 }
 
-function readProperties(properties: Element): ds.Set {
-  /** properties is an rPr or pPr element
+/**
+`properties` is an rPr or pPr element
 
-  Returns a set of style strings (like "bold" or "italic"), as an instance of
-  S (from sets.js)
-  */
-  var styles = new ds.Set();
+Returns a set of style strings (like "bold" or "italic"), as an instance of
+S (from sets.js)
+*/
+function readProperties(properties: Element): adts.Set {
+  var styles = new adts.Set();
   // everything we care about will an immediate child of the rPr or pPr
-  eachChildElement(properties, function(child) {
+  eachChildElement(properties, child => {
     var tag = dropNS(child.tagName);
     var val = child.getAttribute('w:val');
     // italics (and bold, but with w:b) can be
@@ -201,15 +170,16 @@ function readProperties(properties: Element): ds.Set {
 
 // readBody, readParagraph, and readRun all use and potentially manipulate the current context
 
+/**
+body will most often be a <w:body> element, but may also be a
+<w:endnote> or <w:footnote> element. Whichever it is, it will always have
+<w:p> children.
+
+The returned node's .childNodes will be xdom.XParagraph objects.
+*/
 function readBody(body: Element, context: Context): xdom.XNode {
-  /** body will most often be a <w:body> element, but may also be a
-   * <w:endnote> or <w:footnote> element. Whichever it is, it will always have
-   * <w:p> children.
-   *
-   * The returned node's .childNodes will be xdom.XParagraph objects.
-  */
   var container = new xdom.XNode();
-  eachChildElement(body, function(paragraph_element) {
+  eachChildElement(body, paragraph_element => {
     var node = readParagraph(paragraph_element, context);
     container.appendChild(node);
   });
@@ -226,7 +196,7 @@ function readParagraph(paragraph_element: Element, context: Context): xdom.XNode
   context.pushStyles([]);
 
   // we need to read w:p's children in a loop, because each w:p's is not a constituent
-  eachChildElement(paragraph_element, function(child) {
+  eachChildElement(paragraph_element, child => {
     var tag = dropNS(child.tagName);
 
     if (tag == 'pPr') {
@@ -234,19 +204,15 @@ function readParagraph(paragraph_element: Element, context: Context): xdom.XNode
       context.setStyles(styles);
     }
     else if (tag == 'r') {
-      readRun(child, context).forEach(function(node) {
-        paragraph.appendChild(node);
-      });
+      readRun(child, context).forEach(node => paragraph.appendChild(node));
     }
     else if (tag == 'hyperlink') {
       // hyperlinks are just wrappers around a single w:r that contains a w:t.
       // you can use the w:hyperlink[@r:id] value and _rels/document.xml.rels to resolve it,
       // but for now I just read the raw link
       context.pushStyles(['hyperlink']);
-      eachChildElement(child, function(hyperlink_child) {
-        readRun(hyperlink_child, context).forEach(function(node) {
-          paragraph.appendChild(node);
-        });
+      eachChildElement(child, hyperlink_child => {
+        readRun(hyperlink_child, context).forEach(node => paragraph.appendChild(node));
       });
       context.popStyles();
     }
@@ -268,9 +234,9 @@ function readParagraph(paragraph_element: Element, context: Context): xdom.XNode
   return paragraph;
 }
 
-function readRun(run: Element, context: Context): Array<xdom.XNode> {
+function readRun(run: Element, context: Context): xdom.XNode[] {
   /** Read the contents of a single w:r element as a list of XNodes
-   * context is the mutable state Context object.
+  context is the mutable state Context object.
   */
   var nodes = [];
 
@@ -278,7 +244,7 @@ function readRun(run: Element, context: Context): Array<xdom.XNode> {
   // an <w:r> will generally contain only one interesting element besides rPr,
   //   e.g., text, footnote reference, endnote reference, or a symbol
   //   but we still iterate through them all; more elegant than multiple find()'s
-  eachChildElement(run, function(child) {
+  eachChildElement(run, child => {
     var tag = dropNS(child.tagName);
     if (tag == 'rPr') {
         // presumably, the rPr will occur before anything else (it does in all the docx xml I've come across)
@@ -412,7 +378,7 @@ function readRun(run: Element, context: Context): Array<xdom.XNode> {
   return nodes;
 }
 
-export function parseXDocument(arraybuffer: ArrayBuffer) {
+export function parseXDocument(arraybuffer: ArrayBuffer): xdom.XDocument {
   var zip = new JSZip(arraybuffer);
 
   // footnotes and endnotes are objects keyed by the w:id value (an integer from 0 to 1)
@@ -434,14 +400,14 @@ export function parseXDocument(arraybuffer: ArrayBuffer) {
   var doc = new xdom.XDocument([], metadata);
 
   var main_document = parseXML(zip.file('word/document.xml').asText());
-  log('Reading document.xml (%d chars)');
+  log('Reading document.xml');
 
   // the root element of the word/document.xml document is a w:document
   var main_document_root = main_document.documentElement;
   // w:document should have one child element: w:body
   var main_document_body = main_document_root.firstElementChild;
   // body.children is a bunch of <w:p> elements, paragraphs
-  _.each(main_document_body.childNodes, function(childNode: Element) {
+  eachChildElement(main_document_body, childNode => {
     var paragraph_node = readParagraph(childNode, context);
     doc.appendChild(paragraph_node);
   });

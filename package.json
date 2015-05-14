@@ -1,7 +1,7 @@
 {
   "name": "xdoc",
-  "version": "0.2.0",
   "description": "Document object manipulation",
+  "version": "0.2.0",
   "keywords": [
     "word",
     "docx",
@@ -9,26 +9,41 @@
     "dom"
   ],
   "homepage": "https://chbrown.github.io/xdoc",
-  "repository": {
-    "type": "git",
-    "url": "git://github.com/chbrown/xdoc.git"
-  },
-  "bugs": {
-    "url": "https://github.com/chbrown/xdoc/issues"
-  },
-  "author": "Christopher Brown",
+  "repository": "git://github.com/chbrown/xdoc.git",
+  "author": "Christopher Brown <io@henrian.com> (http://henrian.com)",
   "license": "MIT",
   "dependencies": {
+    "adts": "*",
+    "jszip": "*",
+    "lodash": "*",
+    "virtual-dom": "*",
     "tex": "*"
   },
-  "staticPattern": "static/lib/{file}",
+  "devDependencies": {
+    "browserify": "*",
+    "watchify": "*",
+    "typescript": "*"
+  },
+  "staticPattern": "build/{file}",
   "staticDependencies": {
-    "angular": "*",
+    "angular": {
+      "filter": [
+        "angular.js",
+        "angular.min.js",
+        "angular-resource.js",
+        "angular-resource.min.js"
+      ]
+    },
     "angular-ui-router": "*",
     "jquery": "*",
-    "lo-dash": "*",
-    "misc-js": "git://github.com/chbrown/misc-js.git",
-    "ng-storage": "*",
-    "requirejs": "*"
+    "lodash": "*",
+    "misc-js": {
+      "url": "git://github.com/chbrown/misc-js.git",
+      "filter": [
+        "angular-plugins.js",
+        "textarea.js"
+      ]
+    },
+    "ng-storage": "*"
   }
 }

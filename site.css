@@ -1,0 +1,34 @@
+body{margin:0}
+table{border-spacing:0;border-collapse:collapse}
+table td,table th{font-size:100%;text-align:left}
+h1,h2,h3,h4,h5,h6{margin:1ex 0}
+div,input,main,nav,section,span,textarea{box-sizing:border-box}
+section{margin-top:5px;margin-bottom:5px;padding-top:5px;padding-bottom:5px}
+.vpad{padding-top:10px;padding-bottom:10px}
+.hpad{padding-left:10px;padding-right:10px}
+body{background-color:#fff;font:14px "Lucida Grande",Arial,sans-serif}
+label[disabled]{color:#777}
+fieldset{margin:10px 10px;border:1px solid #CCC}
+.code,code{font-family:monospace}
+.help{font-size:80%;color:#444;cursor:pointer}
+table td,table th{padding:1px 4px 2px 2px;vertical-align:top}
+nav[fixedflow]{left:0;right:0;z-index:100;font-size:90%;background-color:#999;padding:0 5px}
+nav[fixedflow] .tab{display:inline-block;padding:2px 6px;margin:3px 0 0 0;border-radius:2px 2px 0 0;background-color:#DDD}
+nav[fixedflow] .tab.current,nav[fixedflow] .tab:hover{background-color:#FDFDFD}
+.wrap{word-break:break-all}
+.raw{white-space:pre-wrap}
+.delete{cursor:pointer;text-decoration:line-through}
+.delete,del{color:#A00}
+.insert{cursor:pointer;text-decoration:underline}
+.insert,ins{color:#0A0}
+.focus{box-shadow:0 0 6px #51cbee}
+table.map td{border-bottom:1px solid rgba(0,0,0,.05)}
+table.map tr:last-child td{border-bottom:none}
+.document{font-family:"Times New Roman",Serif}
+.document span{border:1px solid pink}
+.document .paragraph{min-height:1.2em;margin:1px;border:1px solid gray;white-space:pre-wrap}
+.document .bold{font-weight:700}
+.document .italic{font-style:italic}
+.document .underline{text-decoration:underline}
+.document .footnote{color:#00f;margin:1px;border:1px solid #00f}
+.document .endnote{color:green}

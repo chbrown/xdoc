@@ -1,54 +1,41 @@
-/*jslint browser: true */
-/// <reference path="typings/tsd.d.ts" />
+/// <reference path="type_declarations/index.d.ts" />
+import adts = require('adts');
+import {VNode, h} from 'virtual-dom';
 
-import domlib = require('./domlib');
-var El = domlib.El;
-
-interface Map<K extends string, V> { [index: string]: V }
-
-import ds = require('./datastructures');
-//var Set = ds.Set;
-
+/**
+A fragment of a Document model; can be either a container,
+or, when extended, a node with some semantic role in a document.
+*/
 export class XNode {
-  /** A fragment of a Document model; can be either a container,
-   * or, when extended, a node with some semantic role in a document.
-  */
-  childNodes: Array<XNode>;
   textContent: string;
-  constructor(childNodes: Array<XNode> = []) {
-    this.childNodes = childNodes;
-  }
-  toDOM(): Node {
+  constructor(public childNodes: XNode[] = []) { }
+  toVNode(): VNode {
     if (this.textContent) {
-      return document.createTextNode(this.textContent);
+      return h('span', this.textContent);
     }
     else {
-      var el = document.createDocumentFragment();
-      this.childNodes.forEach(function(childNode) {
-        el.appendChild(childNode.toDOM());
-      });
-      return el;
+      return h('span', this.childNodes.map(childNode => childNode.toVNode()));
     }
   }
   appendChild(newChild: XNode) {
     this.childNodes.push(newChild);
   }
+  /** modifies this WordContainer's children so that contiguous WordSpan
+  objects with the congruent styles are merged into a single WordSpan.
+  This is mostly about whitespace; smoothing out whitespace where possible to
+  match neighbors.
+
+  It's easiest to modify existing Span objects, so style cleaning is done in-place
+
+  * Find groups of contiguous styles (whitespace has flexible styles),
+    but de-style whitespace outside such groups.
+  * Previously, this would simply have empty or total-whitespace spans
+    adopt the styles of the most recent non-whitespace span, but that
+    isn't pretty.
+
+   TODO: fix implementation
+  */
   normalize(): XNode {
-    /** modifies this WordContainer's children so that contiguous WordSpan
-    objects with the congruent styles are merged into a single WordSpan.
-    This is mostly about whitespace; smoothing out whitespace where possible to
-    match neighbors.
-
-    It's easiest to modify existing Span objects, so style cleaning is done in-place
-
-    * Find groups of contiguous styles (whitespace has flexible styles),
-      but de-style whitespace outside such groups.
-    * Previously, this would simply have empty or total-whitespace spans
-      adopt the styles of the most recent non-whitespace span, but that
-      isn't pretty.
-
-     TODO: fix implementation
-    */
     throw new Error('Not yet implemented');
     // inner_spans and outer_spans are temporary lists of spans
     // var inner_spans = [];
@@ -99,67 +86,53 @@ export class XNode {
 }
 
 export class XParagraph extends XNode {
-  toDOM() {
-    /** Output is similar to XNode's, but returns an actual HTML DOM element,
-     * a div.paragraph, rather than a document fragment
-     */
-    var el = document.createElement('div');
-    el.className = 'paragraph';
-
-    this.childNodes.forEach(function(childNode) {
-      el.appendChild(childNode.toDOM());
-    });
-
-    return el;
+  /**
+  Output is similar to XNode's, but returns an actual HTML DOM element,
+  a div.paragraph, rather than a document fragment
+  */
+  toVNode(): VNode {
+    return h('div.paragraph', this.childNodes.map(childNode => childNode.toVNode()));
   }
-  toTeX() {
-    /** Returns a string */
+  /** Returns a string */
+  toTeX(): string {
     throw new Error('Not yet implemented');
   }
 }
 
 export class XDocument extends XNode {
-  metadata: Map<string, string>; // {[index: string]: string};
-  constructor(childNodes: Array<XNode>, metadata: Map<string, string>) {
+  metadata: Map<string>; // {[index: string]: string};
+  constructor(childNodes: Array<XNode>, metadata: Map<string>) {
     super(childNodes);
     this.metadata = metadata;
   }
 }
 
+/**
+XSpan is the basic text block of a document, associated with a single
+basic string and maybe some styles.
+*/
 export class XSpan extends XNode {
-  /** Span is the basic text block of a document, associated with a single
-   unadorned string and maybe some styles.
-   */
-  textContent: string;
-  styles: ds.Set;
-  constructor(textContent: string, styles: ds.Set) {
-    super();
-    this.textContent = textContent;
-    this.styles = styles;
-  }
-  toDOM() {
-    var span = El('span', {}, [this.textContent]);
-
+  constructor(public textContent: string, public styles: adts.Set) { super() }
+  toVNode(): VNode {
+    var classList: string[] = [];
     if (this.styles.contains('italic')) {
-      span.classList.add('italic');
+      classList.push('italic');
     }
-
     if (this.styles.contains('bold')) {
-      span.classList.add('bold');
+      classList.push('bold');
     }
-
-    return span;
+    return h('span', {className: classList.join(' ')}, [this.textContent]);
   }
 }
 
 export class XFootnote extends XNode {
-  toDOM() {
-    return El('div', {'class': 'footnote'}, [super.toDOM()]);
+  toVNode(): VNode {
+    return h('div.footnote', [super.toVNode()]);
   }
 }
 
 export class XEndnote extends XNode {
-  toDOM() {
-    return El('div', {'class': 'endnote'}, [super.toDOM()]);
+  toVNode(): VNode {
+    return h('div.endnote', [super.toVNode()]);
   }
 }
