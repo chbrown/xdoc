@@ -82,11 +82,16 @@ app.config(($stateProvider, $urlRouterProvider) => {
     url: '/xdoc',
     templateUrl: 'templates/xdoc.html',
     controller: 'xdocCtrl',
-  });
+  })
   // .state('validate', {
   //   url: '/validate',
   //   templateUrl: 'templates/validate.html',
   // });
+  .state('latex', {
+    url: '/latex',
+    templateUrl: 'templates/latex.html',
+    controller: 'latexCtrl',
+  });
 });
 
 function readFileAsDataURL(file: File, callback) {
@@ -171,13 +176,18 @@ app.controller('wordFileCtrl', ($scope, $state, $localStorage) => {
 app.controller('xdocCtrl', ($scope, $localStorage) => {
   $scope.$storage = $localStorage;
 
-  $scope.$watch('$storage.file.arraybuffer', (arraybuffer: ArrayBuffer) => {
-    if (arraybuffer && arraybuffer.byteLength > 0) {
-      var parser = new docx.Parser(arraybuffer);
-      $scope.document = parser.document;
-    }
-  });
+  var parser = new docx.Parser($scope.$storage.file.arraybuffer);
+  $scope.document = parser.document;
 });
+
+app.controller('latexCtrl', ($scope, $localStorage) => {
+  $scope.$storage = $localStorage;
+
+  var parser = new docx.Parser($scope.$storage.file.arraybuffer);
+  var document = parser.document;
+  $scope.latex = document.toLaTeX();
+});
+
 
 app.directive('xdomDocument', () => {
   return {

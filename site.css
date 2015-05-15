@@ -36,3 +36,4 @@ table.map tr:last-child td{border-bottom:none}
 .xml .start{color:green}
 .xml .end{color:red}
 .xml .text{color:#00f}
+.latex{font-size:11px;font-family:Consolas,Monaco,Menlo,monospace;white-space:pre-wrap}

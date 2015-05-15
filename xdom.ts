@@ -23,6 +23,10 @@ interface StyleDeclaration {
   verticalAlign?: string;
 }
 
+function t(command: string, content: string): string {
+  return `\\${command}{${content}}`;
+}
+
 /**
 A fragment of a Document model; can be either a container,
 or, when extended, a node with some semantic role in a document.
@@ -31,6 +35,13 @@ export class XNode {
   constructor(public childNodes: XNode[] = [],
               public textContent: string = null,
               public styles: number = 0) { }
+
+  appendChild(newChild: XNode) {
+    this.childNodes.push(newChild);
+  }
+  appendChildren(newChildren: XNode[]) {
+    Array.prototype.push.apply(this.childNodes, newChildren);
+  }
 
   getProperties(): VProperties {
     // could be CSSStyleDeclaration but all the properties are required
@@ -66,12 +77,29 @@ export class XNode {
   toVNode(): VNode {
     return h('span', this.getProperties(), this.getContent());
   }
-  appendChild(newChild: XNode) {
-    this.childNodes.push(newChild);
+  toLaTeX(): string {
+    var content = this.textContent ? this.textContent : this.childNodes.map(childNode => childNode.toLaTeX()).join('\n');
+    if (this.styles & Style.Italic) {
+      content = t('textit', content);
+    }
+    if (this.styles & Style.Bold) {
+      content = t('textbf', content);
+    }
+    if (this.styles & Style.Underline) {
+      content = t('underline', content);
+    }
+
+    // it'd be weird if something was both subscript and superscript, but maybe?
+    if (this.styles & Style.Subscript) {
+      content = t('textsubscript', t('text', content));
+    }
+    if (this.styles & Style.Superscript) {
+      content = t('textsuperscript', t('text', content));
+    }
+
+    return content;
   }
-  appendChildren(newChildren: XNode[]) {
-    Array.prototype.push.apply(this.childNodes, newChildren);
-  }
+
   /** modifies this WordContainer's children so that contiguous WordSpan
   objects with the congruent styles are merged into a single WordSpan.
   This is mostly about whitespace; smoothing out whitespace where possible to

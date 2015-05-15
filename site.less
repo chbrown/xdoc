@@ -82,17 +82,24 @@ nav[fixedflow] {
   }
 }
 
+/* https://developer.mozilla.org/en-US/docs/Web/CSS/word-break
+- `word-break: normal` Use the default line break rule.
+- `word-break: break-all` Word breaks may be inserted between any character for non-CJK text.
+- `word-break: keep-all` Don't allow word breaks for CJK text. Non-CJK text behavior is same as normal.
+*/
 .wrap {
-  // "break-all: Word breaks may be inserted between any character
-  //   for non-CJK (Chinese/Japanese/Korean) text."
   word-break: break-all;
   white-space: pre-wrap;
 }
+
+/* https://developer.mozilla.org/en-US/docs/Web/CSS/white-space
+- `white-space: normal` Sequences of whitespace are collapsed. Newline characters in the source are handled as other whitespace. Breaks lines as necessary to fill line boxes.
+- `white-space: nowrap` Collapses whitespace as for normal, but suppresses line breaks (text wrapping) within text.
+- `white-space: pre` Sequences of whitespace are preserved, lines are only broken at newline characters in the source and at <br> elements.
+- `white-space: pre-wrap` Sequences of whitespace are preserved. Lines are broken at newline characters, at <br>, and as necessary to fill line boxes.
+- `white-space: pre-line` Sequences of whitespace are collapsed. Lines are broken at newline characters, at <br>, and as necessary to fill line boxes.
+*/
 .raw {
-  // https://developer.mozilla.org/en-US/docs/Web/CSS/white-space
-  // "pre-wrap: Sequences of whitespace are preserved.
-  //   Lines are broken at newline characters, at <br>,
-  //   and as necessary to fill line boxes."
   white-space: pre-wrap;
 }
 
@@ -189,4 +196,11 @@ table.map {
   .text {
     color: blue;
   }
+}
+
+.latex {
+  font-size: 11px;
+  font-family: Consolas, Monaco, Menlo, monospace;
+
+  white-space: pre-wrap;
 }
