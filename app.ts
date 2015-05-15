@@ -71,6 +71,11 @@ app.config(($stateProvider, $urlRouterProvider) => {
     url: '/word',
     templateUrl: 'templates/word.html',
     controller: 'wordCtrl',
+  })
+  .state('xdoc', {
+    url: '/xdoc',
+    templateUrl: 'templates/xdoc.html',
+    controller: 'xdocCtrl',
   });
   // .state('validate', {
   //   url: '/validate',
@@ -124,29 +129,28 @@ Types['LocalFile'] = LocalFile;
 app.controller('wordCtrl', ($scope, $localStorage) => {
   $scope.$storage = $localStorage;
 
-  var upload_el = document.querySelector('input[type="file"]');
-  angular.element(upload_el).on('change', ev => {
-    $scope.$apply(function() {
-      var input = <HTMLInputElement>ev.target;
-      var file = input.files[0];
-      // sample file = {
-      //   lastModifiedDate: Tue Mar 04 2014 15:57:25 GMT-0600 (CST)
-      //   name: "asch-stims.xlsx"
-      //   size: 34307
-      //   type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-      //   webkitRelativePath: ""
-      // }
-      $scope.$storage.file = new LocalFile(file.name, file.size, file.type, file.lastModifiedDate);
+  $scope.readFile = (file: File) => {
+    // sample file = {
+    //   lastModifiedDate: Tue Mar 04 2014 15:57:25 GMT-0600 (CST)
+    //   name: "asch-stims.xlsx"
+    //   size: 34307
+    //   type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    //   webkitRelativePath: ""
+    // }
+    $scope.$storage.file = new LocalFile(file.name, file.size, file.type, file.lastModifiedDate);
 
-      readFileAsArrayBuffer(file, (err, arraybuffer) => {
-        $scope.$apply(function() {
-          if (err) throw err;
-          // return $flash('Error reading file ' + file.name);
-          $scope.$storage.file.arraybuffer = arraybuffer;
-        });
+    readFileAsArrayBuffer(file, (err, arraybuffer) => {
+      $scope.$apply(function() {
+        if (err) throw err;
+        // return $flash('Error reading file ' + file.name);
+        $scope.$storage.file.arraybuffer = arraybuffer;
       });
     });
-  });
+  };
+});
+
+app.controller('xdocCtrl', ($scope, $localStorage) => {
+  $scope.$storage = $localStorage;
 
   $scope.$watch('$storage.file.arraybuffer', (new_arraybuffer: ArrayBuffer) => {
     if (new_arraybuffer && new_arraybuffer.byteLength > 0) {

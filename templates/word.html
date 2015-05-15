@@ -2,17 +2,12 @@
   <form>
     <label>
       <div><b>Upload Word Doc</b></div>
-      <input type="file">
+      <input type="file" on-upload="readFile($file)">
     </label>
   </form>
-
-  <section>
-    <label><input type="checkbox" ng-model="$storage.showFileStats"> Show file stats</label>
-    <label><input type="checkbox" ng-model="$storage.showMetadata"> Show metadata</label>
-  </section>
 </section>
 
-<section class="hpad" ng-show="$storage.showFileStats">
+<section class="hpad">
   <h3>Stored file</h3>
   <ul>
     <li>Modified: {{$storage.file.lastModifiedDate | date:'MMMM d, y h:mm a'}}</li>
@@ -21,17 +16,4 @@
     <li>MIME Type: {{$storage.file.type}}</li>
     <li>ArrayBuffer.byteLength: {{$storage.file.arraybuffer.byteLength}}</li>
   </ul>
-</section>
-
-<section class="hpad" ng-show="$storage.showMetadata">
-  <h3>Document metadata</h3>
-  <ul>
-    <li ng-repeat="(key, value) in document.metadata">{{key}}: {{value}}</li>
-  </ul>
-</section>
-
-<section class="hpad">
-  <h2>Document</h2>
-
-  <div class="document labeled" xdom-document="document"></div>
 </section>

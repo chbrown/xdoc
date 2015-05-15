@@ -1,0 +1,12 @@
+<section class="hpad">
+  <h3>Document metadata</h3>
+  <ul>
+    <li ng-repeat="(key, value) in document.metadata">{{key}}: {{value}}</li>
+  </ul>
+</section>
+
+<section class="hpad">
+  <h2>Document</h2>
+
+  <div class="document labeled" xdom-document="document"></div>
+</section>

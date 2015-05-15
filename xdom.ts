@@ -148,11 +148,8 @@ export class XParagraph extends XNode {
 }
 
 export class XDocument extends XNode {
-  constructor(childNodes: XNode[], public metadata: Map<string>) {
-    super(childNodes);
-  }
+  constructor(public metadata: Map<string>) { super() }
 }
-
 
 /**
 XSpan is the basic text block of a document, associated with a single
@@ -163,12 +160,12 @@ childNodes should always be empty.
 
 export class XFootnote extends XNode {
   toVNode(): VNode {
-    return h('span.footnote', [super.toVNode()]);
+    return h('span.footnote', this.getProperties(), this.getContent());
   }
 }
 
 export class XEndnote extends XNode {
   toVNode(): VNode {
-    return h('span.endnote', [super.toVNode()]);
+    return h('span.endnote', this.getProperties(), this.getContent());
   }
 }

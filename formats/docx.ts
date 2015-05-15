@@ -434,7 +434,7 @@ export function parseXDocument(arraybuffer: ArrayBuffer): xdom.XDocument {
   var core_document = parseXML(zip.file('docProps/core.xml').asText());
   var metadata = readMetadata(core_document);
 
-  var doc = new xdom.XDocument([], metadata);
+  var doc = new xdom.XDocument(metadata);
 
   var main_document = parseXML(zip.file('word/document.xml').asText());
   log('Reading document.xml');
