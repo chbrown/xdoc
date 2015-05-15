@@ -68,6 +68,12 @@ nav[fixedflow] {
   background-color: #999;
   padding: 0 5px;
 
+  // prevent user-select so that we call super+a (select all) on the latex
+  // page and not pick up the navigation tabs.
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+
   .tab {
     display: inline-block;
     padding: 2px 6px;

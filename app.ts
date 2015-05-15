@@ -183,6 +183,8 @@ app.controller('xdocCtrl', ($scope, $localStorage) => {
 app.controller('latexCtrl', ($scope, $localStorage) => {
   $scope.$storage = $localStorage;
 
+  $scope.timestamp = new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '');
+
   var parser = new docx.Parser($scope.$storage.file.arraybuffer);
   var document = parser.document;
   $scope.latex = document.toLaTeX();

@@ -2,6 +2,7 @@
 import _ = require('lodash');
 import adts = require('adts');
 import {VNode, VProperties, h} from 'virtual-dom';
+import {replacements, replacementRegExp} from './latex';
 
 // We can do bitwise math in Javascript up to 2^29, so we can have up to
 // 29 styles
@@ -25,6 +26,11 @@ interface StyleDeclaration {
 
 function t(command: string, content: string): string {
   return `\\${command}{${content}}`;
+}
+
+function stringToLaTeX(raw: string): string {
+  // log('Escaping: "%s"', string.encode('utf8'))
+  return raw.replace(replacementRegExp, match => replacements[match]);
 }
 
 /**
@@ -78,7 +84,7 @@ export class XNode {
     return h('span', this.getProperties(), this.getContent());
   }
   toLaTeX(): string {
-    var content = this.textContent ? this.textContent : this.childNodes.map(childNode => childNode.toLaTeX()).join('\n');
+    var content = this.textContent ? stringToLaTeX(this.textContent) : this.childNodes.map(childNode => childNode.toLaTeX()).join('');
     if (this.styles & Style.Italic) {
       content = t('textit', content);
     }
@@ -91,10 +97,10 @@ export class XNode {
 
     // it'd be weird if something was both subscript and superscript, but maybe?
     if (this.styles & Style.Subscript) {
-      content = t('textsubscript', t('text', content));
+      content = t('textsubscript', content);
     }
     if (this.styles & Style.Superscript) {
-      content = t('textsuperscript', t('text', content));
+      content = t('textsuperscript', content);
     }
 
     return content;
