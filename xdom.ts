@@ -1,21 +1,69 @@
 /// <reference path="type_declarations/index.d.ts" />
+import _ = require('lodash');
 import adts = require('adts');
-import {VNode, h} from 'virtual-dom';
+import {VNode, VProperties, h} from 'virtual-dom';
+
+// We can do bitwise math in Javascript up to 2^29
+// 2 << 29 ==  1073741824 == 2^30
+// 2 << 30 == -2147483648 != 2^31
+export enum Style {
+  Bold = 1,
+  Italic = 2,
+  Underline = 4,
+  Subscript = 8,
+  Superscript = 16,
+}
+
+interface StyleDeclaration {
+  fontSize?: string;
+  fontStyle?: string;
+  fontWeight?: string;
+  textDecoration?: string;
+  verticalAlign?: string;
+}
 
 /**
 A fragment of a Document model; can be either a container,
 or, when extended, a node with some semantic role in a document.
 */
 export class XNode {
-  textContent: string;
-  constructor(public childNodes: XNode[] = []) { }
+  constructor(public childNodes: XNode[] = [],
+              public textContent: string = null,
+              public styles: number = 0) { }
+
+  getProperties(): VProperties {
+    // could be CSSStyleDeclaration but all the properties are required
+    var style: StyleDeclaration = {};
+    if (this.styles & Style.Italic) {
+      style.fontStyle = 'italic';
+    }
+    if (this.styles & Style.Bold) {
+      style.fontWeight = 'bold';
+    }
+    if (this.styles & Style.Underline) {
+      style.textDecoration = 'underline';
+    }
+
+    // it'd be weird if something was both subscript and superscript, but maybe?
+    if (this.styles & Style.Subscript) {
+      style.verticalAlign = 'sub';
+      style.fontSize = 'xx-small';
+    }
+    if (this.styles & Style.Superscript) {
+      style.verticalAlign = 'super';
+      style.fontSize = 'xx-small';
+    }
+
+    // use `|| undefined` to avoid creating an empty title attribute
+    var title = undefined; // this.styles.toJSON().join('; ') ||
+
+    return {style: style, title: title};
+  }
+  getContent() {
+    return this.textContent ? this.textContent : this.childNodes.map(childNode => childNode.toVNode());
+  }
   toVNode(): VNode {
-    if (this.textContent) {
-      return h('span', this.textContent);
-    }
-    else {
-      return h('span', this.childNodes.map(childNode => childNode.toVNode()));
-    }
+    return h('span', this.getProperties(), this.getContent());
   }
   appendChild(newChild: XNode) {
     this.childNodes.push(newChild);
@@ -91,7 +139,7 @@ export class XParagraph extends XNode {
   a div.paragraph, rather than a document fragment
   */
   toVNode(): VNode {
-    return h('div.paragraph', this.childNodes.map(childNode => childNode.toVNode()));
+    return h('div.paragraph', this.getProperties(), this.getContent())
   }
   /** Returns a string */
   toTeX(): string {
@@ -100,39 +148,27 @@ export class XParagraph extends XNode {
 }
 
 export class XDocument extends XNode {
-  metadata: Map<string>; // {[index: string]: string};
-  constructor(childNodes: Array<XNode>, metadata: Map<string>) {
+  constructor(childNodes: XNode[], public metadata: Map<string>) {
     super(childNodes);
-    this.metadata = metadata;
   }
 }
+
 
 /**
 XSpan is the basic text block of a document, associated with a single
 basic string and maybe some styles.
+
+childNodes should always be empty.
 */
-export class XSpan extends XNode {
-  constructor(public textContent: string, public styles: adts.Set) { super() }
-  toVNode(): VNode {
-    var classList: string[] = [];
-    if (this.styles.contains('italic')) {
-      classList.push('italic');
-    }
-    if (this.styles.contains('bold')) {
-      classList.push('bold');
-    }
-    return h('span', {className: classList.join(' ')}, [this.textContent]);
-  }
-}
 
 export class XFootnote extends XNode {
   toVNode(): VNode {
-    return h('div.footnote', [super.toVNode()]);
+    return h('span.footnote', [super.toVNode()]);
   }
 }
 
 export class XEndnote extends XNode {
   toVNode(): VNode {
-    return h('div.endnote', [super.toVNode()]);
+    return h('span.endnote', [super.toVNode()]);
   }
 }

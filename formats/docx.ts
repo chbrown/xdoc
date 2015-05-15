@@ -21,26 +21,36 @@ function eachChildElement(node: Node, func: (element: Element) => void) {
   }
 }
 
+class ComplexField extends xdom.XNode {
+  /** `separated` is set to true when w:fldChar[fldCharType="separate"] is reached. */
+  separated = false;
+  /** `code` is set to the value of a <w:instrText> that contains a 'REF ...' value. */
+  code: string;
+  /** `childNodes` is a container of the nodes between the "separate" and the "end" markers */
+  constructor() { super() }
+}
+
 class Context {
+  complexFieldStack = new adts.Stack<ComplexField>();
+  stylesStack = new adts.Stack<number>(); // [0]
   constructor(public footnotes: Map<xdom.XFootnote> = {},
-              public endnotes: Map<xdom.XEndnote> = {},
-              public style_stack: adts.Set[] = [new adts.Set()]) { }
-  pushStyles(styles: string[] = []): void {
-    this.style_stack.push(new adts.Set(styles));
-  }
-  popStyles() {
-    return this.style_stack.pop();
-  }
-  setStyles(styles: adts.Set): void {
-    this.style_stack[this.style_stack.length - 1] = styles;
-  }
-  addStyles(styles: string[]): void {
-    var top = this.style_stack[this.style_stack.length - 1];
-    this.setStyles(adts.Set.union([top, new adts.Set(styles)]));
-  }
-  currentStyles() {
-    /** Returns set (as instance of S) */
-    return adts.Set.union(this.style_stack);
+              public endnotes: Map<xdom.XEndnote> = {}) { }
+  // pushStyles(styles: string[] = []): void {
+  //   this.style_stack.push(new adts.Set(styles));
+  // }
+  // popStyles() {
+  //   return this.style_stack.pop();
+  // }
+  // setStyles(styles: adts.Set): void {
+  //   this.style_stack[this.style_stack.length - 1] = styles;
+  // }
+  // addStyles(styles: string[]): void {
+  //   var top = this.style_stack[this.style_stack.length - 1];
+  //   this.setStyles(adts.Set.union([top, new adts.Set(styles)]));
+  // }
+  /** Combines all styles in the stack */
+  currentStyles(): number {
+    return this.stylesStack.getElements().reduce((a, b) => a | b, 0);
   }
 }
 
@@ -130,11 +140,10 @@ function readRelationships(relationships_document: Document): Map<string> {
 /**
 `properties` is an rPr or pPr element
 
-Returns a set of style strings (like "bold" or "italic"), as an instance of
-S (from sets.js)
+Returns a bitstring of xdom.Style flags
 */
-function readProperties(properties: Element): adts.Set {
-  var styles = new adts.Set();
+function readProperties(properties: Element): number {
+  var styles = 0;
   // everything we care about will an immediate child of the rPr or pPr
   eachChildElement(properties, child => {
     var tag = dropNS(child.tagName);
@@ -143,28 +152,27 @@ function readProperties(properties: Element): adts.Set {
     //   <w:rPr><w:i/></w:rPr> or <w:rPr><w:i w:val='1' /></w:rPr>
     //   but not <w:rPr><w:i w:val='0'/></w:rPr>
     if (tag == 'i' && val != '0') {
-      styles._add('italic');
+      styles |= xdom.Style.Italic;
     }
     else if (tag == 'b' && val != '0') {
-      styles._add('bold');
+      styles |= xdom.Style.Bold;
     }
     else if (tag == 'vertAlign' && val == 'subscript') {
-      styles._add('subscript');
+      styles |= xdom.Style.Subscript;
     }
     else if (tag == 'vertAlign' && val == 'superscript') {
-      styles._add('superscript');
+      styles |= xdom.Style.Superscript;
     }
     else if (tag == 'position' && val == '-4') {
-      styles._add('subscript');
+      styles |= xdom.Style.Subscript;
     }
     else if (tag == 'position' && val == '6') {
-      styles._add('superscript');
+      styles |= xdom.Style.Superscript;
     }
     else {
       // log('Ignoring %s > %s', dropNS(properties_element.tagName), tag); // , child
     }
   });
-
   return styles;
 }
 
@@ -186,35 +194,40 @@ function readBody(body: Element, context: Context): xdom.XNode {
   return container;
 }
 
-function readParagraph(paragraph_element: Element, context: Context): xdom.XNode {
-  /** p should be a DOM Element <w:p> from the original Word document XML.
+/**
+p should be a DOM Element <w:p> from the original Word document XML.
 
-  returns a word.WordContainer, which will have a bunch of WordNode children
-  (which can then be joined based on style congruence)
-  */
+returns a single xdom.XNode, which will have a bunch of XNode children
+(which can then be joined based on style congruence)
+*/
+function readParagraph(paragraph_element: Element, context: Context): xdom.XNode {
   var paragraph = new xdom.XParagraph();
-  context.pushStyles([]);
+  context.stylesStack.push(0);
 
   // we need to read w:p's children in a loop, because each w:p's is not a constituent
   eachChildElement(paragraph_element, child => {
     var tag = dropNS(child.tagName);
 
     if (tag == 'pPr') {
-      var styles = readProperties(child);
-      context.setStyles(styles);
+      context.stylesStack.top = readProperties(child);
     }
     else if (tag == 'r') {
-      readRun(child, context).forEach(node => paragraph.appendChild(node));
+      // readRun will most often only return one node
+      var run_nodes = readRun(child, context);
+      // by the time we get to runs inside a complexField, `context.complexFieldStack.top.separated` should be true
+      var currentParent = context.complexFieldStack.top || paragraph;
+      // log('readRun currentParent', currentParent);
+      run_nodes.forEach(node => currentParent.appendChild(node));
     }
     else if (tag == 'hyperlink') {
       // hyperlinks are just wrappers around a single w:r that contains a w:t.
       // you can use the w:hyperlink[@r:id] value and _rels/document.xml.rels to resolve it,
       // but for now I just read the raw link
-      context.pushStyles(['hyperlink']);
+      // context.pushStyles(['hyperlink']);
       eachChildElement(child, hyperlink_child => {
         readRun(hyperlink_child, context).forEach(node => paragraph.appendChild(node));
       });
-      context.popStyles();
+      // context.popStyles();
     }
     else if (tag == 'proofErr') {
       // these mark where the squiggly lines go. Why this is part of OpenXML
@@ -229,18 +242,20 @@ function readParagraph(paragraph_element: Element, context: Context): xdom.XNode
     }
   });
 
-  context.popStyles();
+  context.stylesStack.pop();
 
   return paragraph;
 }
 
-function readRun(run: Element, context: Context): xdom.XNode[] {
-  /** Read the contents of a single w:r element as a list of XNodes
-  context is the mutable state Context object.
-  */
-  var nodes = [];
+/**
+Read the contents of a single w:r element (`run`) as a list of XNodes
 
-  context.pushStyles();
+context is the mutable state Context object.
+*/
+function readRun(run: Element, context: Context): xdom.XNode[] {
+  var nodes: xdom.XNode[] = [];
+
+  context.stylesStack.push(0);
   // an <w:r> will generally contain only one interesting element besides rPr,
   //   e.g., text, footnote reference, endnote reference, or a symbol
   //   but we still iterate through them all; more elegant than multiple find()'s
@@ -248,8 +263,7 @@ function readRun(run: Element, context: Context): xdom.XNode[] {
     var tag = dropNS(child.tagName);
     if (tag == 'rPr') {
         // presumably, the rPr will occur before anything else (it does in all the docx xml I've come across)
-      var styles = readProperties(child);
-      context.setStyles(styles);
+      context.stylesStack.top = readProperties(child);
     }
     else if (tag == 'footnoteReference') {
       var footnote_id = child.getAttribute('w:id');
@@ -285,15 +299,15 @@ function readRun(run: Element, context: Context): xdom.XNode[] {
       // if replacement is None:
       //     logger.critical('Could not find symbol in map: %r' % char)
       //     replacement = u'MISSING SYMBOL (%r)' % char
-      var sym_node = new xdom.XSpan(text, context.currentStyles());
+      var sym_node = new xdom.XNode([], text, context.currentStyles());
       nodes.push(sym_node);
     }
     else if (tag == 't') {
-      var t_node = new xdom.XSpan(child.textContent, context.currentStyles());
+      var t_node = new xdom.XNode([], child.textContent, context.currentStyles());
       nodes.push(t_node);
     }
     else if (tag == 'tab') {
-      var tab_node = new xdom.XSpan('\t', context.currentStyles());
+      var tab_node = new xdom.XNode([], '\t', context.currentStyles());
       nodes.push(tab_node);
     }
     else if (tag == 'instrText') {
@@ -309,31 +323,49 @@ function readRun(run: Element, context: Context): xdom.XNode[] {
       var text = child.textContent;
       var hyperlink_match = text.match(/ HYPERLINK "(.+)" \\t ".+"/);
       if (hyperlink_match) {
-        context.addStyles(['hyperlink', 'url=' + hyperlink_match[1]]);
+        log('Ignoring hyperlink instrText', hyperlink_match[1]);
+        // context.addStyles(['hyperlink', 'url=' + hyperlink_match[1]]);
       }
 
-      var ref_match = text.match(/ REF (.+)/);
+      var ref_match = text.match(/^ REF (.+) $/);
       if (ref_match) {
         var ref = ref_match[1];
         // prototype = Hyperlink('REF => %s' % ref, r_styles)
-        log('Ignoring REF-type', ref);
+        log(`Setting complex field (${context.complexFieldStack.top}).code to "${ref}"`);
+        // `context.complexFieldStateStack.top` should not be undefined, and
+        // `context.complexFieldStateStack.top.separated` should be false
+        context.complexFieldStack.top.code = ref;
       }
 
       var counter_match = text.match(/ LISTNUM (.*) $/);
       if (counter_match) {
-        context.addStyles(['counter', 'series=' + counter_match[1]]);
+        log('Ignoring counter instrText', counter_match[1]);
+        // context.addStyles(['counter', 'series=' + counter_match[1]]);
       }
     }
     else if (tag == 'fldChar') {
+      // fldChar indicates a field character. The variable is specified between
+      // the 'begin' and 'separate' fldCharTypes (usually as instrText), and the
+      // current displayed value is specified between the 'separate' and 'end' types.
       var field_signal = child.getAttribute('w:fldCharType');
       if (field_signal == 'begin') {
         log('r > fldChar: fldCharType=begin');
+        context.complexFieldStack.push(new ComplexField());
       }
       else if (field_signal == 'separate') {
         log('r > fldChar: fldCharType=separate');
+        context.complexFieldStack.top.separated = true;
       }
       else if (field_signal == 'end') {
         log('r > fldChar: fldCharType=end');
+        var complexField = context.complexFieldStack.pop();
+
+        // var styles = context.currentStyles().add(`REF=${complexField.code}`);
+        log('ignoring fldChar REF', complexField.code);
+
+        var field_node = new xdom.XNode(complexField.childNodes, null, context.currentStyles());
+        log('pop field_node', field_node);
+        nodes.push(field_node);
         // var change = child.find('{*}numberingChange');
         // var span;
         // if (change) {
@@ -343,8 +375,7 @@ function readRun(run: Element, context: Context): xdom.XNode[] {
         // log('Found fldCharType=end; reverting p_styles and p_attrs');
       }
       else {
-        var message = 'r > fldChar: Unrecognized fldCharType: ' + field_signal;
-        throw new Error(message );
+        throw new Error(`r > fldChar: Unrecognized fldCharType: ${field_signal}`);
       }
     }
     else if (tag == 'separator') {
@@ -366,16 +397,23 @@ function readRun(run: Element, context: Context): xdom.XNode[] {
     }
     else if (tag == 'br') {
       // TODO: should this be a line break of some sort?
-      var break_node = new xdom.XSpan('\n', context.currentStyles());
+      var break_node = new xdom.XNode([], '\n', context.currentStyles());
       nodes.push(break_node);
     }
     else {
       log('r > %s ignored', tag); // , child
     }
   });
-  context.popStyles();
+  context.stylesStack.pop();
 
   return nodes;
+}
+
+function readFootnotesFile(file: JSZipObject): Map<xdom.XFootnote> {
+  return file ? readFootnotes(parseXML(file.asText())) : {};
+}
+function readEndnotesFile(file: JSZipObject): Map<xdom.XEndnote> {
+  return file ? readEndnotes(parseXML(file.asText())) : {};
 }
 
 export function parseXDocument(arraybuffer: ArrayBuffer): xdom.XDocument {
@@ -383,10 +421,9 @@ export function parseXDocument(arraybuffer: ArrayBuffer): xdom.XDocument {
 
   // footnotes and endnotes are objects keyed by the w:id value (an integer from 0 to 1)
   // to an Array of spans
-  var footnotes_doc = parseXML(zip.file('word/footnotes.xml').asText());
-  var footnotes = readFootnotes(footnotes_doc);
-  var endnotes_doc = parseXML(zip.file('word/endnotes.xml').asText());
-  var endnotes = readEndnotes(endnotes_doc);
+  // The footnotes.xml and endnotes.xml files may not exist.
+  var footnotes = readFootnotesFile(zip.file('word/footnotes.xml'));
+  var endnotes = readEndnotesFile(zip.file('word/endnotes.xml'));
   var context = new Context(footnotes, endnotes);
 
   // relationships is a mapping from Id's to Target's
