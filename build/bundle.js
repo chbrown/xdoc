@@ -1,113 +1,4 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
-var base64_chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-// function encodeArrayBuffer(arraybuffer) {
-//   var array = new Uint8Array(arraybuffer);
-//   return String.fromCharCode.apply(null, array);
-// }
-function encodeArrayBuffer(arraybuffer) {
-    /** Converts an ArrayBuffer directly to base64, without any intermediate
-        'convert to string then use window.btoa' step. According to my tests,
-        this appears to be a faster approach: http://jsperf.com/encoding-xhr-image-data/5
-  
-        https://gist.github.com/jonleighton/958841
-    */
-    var base64 = '';
-    var bytes = new Uint8Array(arraybuffer);
-    var byteLength = bytes.byteLength;
-    var byteRemainder = byteLength % 3;
-    var mainLength = byteLength - byteRemainder;
-    var a, b, c, d;
-    var chunk;
-    // Main loop deals with bytes in chunks of 3
-    for (var i = 0; i < mainLength; i = i + 3) {
-        // Combine the three bytes into a single integer
-        chunk = (bytes[i] << 16) | (bytes[i + 1] << 8) | bytes[i + 2];
-        // Use bitmasks to extract 6-bit segments from the triplet
-        a = (chunk & 16515072) >> 18; // 16515072 = (2^6 - 1) << 18
-        b = (chunk & 258048) >> 12; // 258048   = (2^6 - 1) << 12
-        c = (chunk & 4032) >> 6; // 4032     = (2^6 - 1) << 6
-        d = chunk & 63; // 63       = 2^6 - 1
-        // Convert the raw binary segments to the appropriate ASCII encoding
-        base64 += base64_chars[a] + base64_chars[b] + base64_chars[c] + base64_chars[d];
-    }
-    // Deal with the remaining bytes and padding
-    if (byteRemainder == 1) {
-        chunk = bytes[mainLength];
-        a = (chunk & 252) >> 2; // 252 = (2^6 - 1) << 2
-        // Set the 4 least significant bits to zero
-        b = (chunk & 3) << 4; // 3   = 2^2 - 1
-        base64 += base64_chars[a] + base64_chars[b] + '==';
-    }
-    else if (byteRemainder == 2) {
-        chunk = (bytes[mainLength] << 8) | bytes[mainLength + 1];
-        a = (chunk & 64512) >> 10; // 64512 = (2^6 - 1) << 10
-        b = (chunk & 1008) >> 4; // 1008  = (2^6 - 1) << 4
-        // Set the 2 least significant bits to zero
-        c = (chunk & 15) << 2; // 15    = 2^4 - 1
-        base64 += base64_chars[a] + base64_chars[b] + base64_chars[c] + '=';
-    }
-    return base64;
-}
-exports.encodeArrayBuffer = encodeArrayBuffer;
-// function decodeArrayBuffer(raw) {
-//   var buffer = new ArrayBuffer(raw.length);
-//   var array = new Uint8Array(buffer);
-//   for (var i = 0, l = raw.length; i < l; i++) {
-//     array[i] = raw.charCodeAt(i);
-//   }
-//   return buffer;
-// }
-// var decodeArrayBuffer = function(input) {
-//   return atob(input);
-// };
-function decodeArrayBuffer(input) {
-    /**
-     * Uses the new array typed in javascript to binary base64 encode/decode
-     * at the moment just decodes a binary base64 encoded
-     * into either an ArrayBuffer (decodeArrayBuffer)
-     * or into an Uint8Array (decode)
-     *
-     * References:
-     * https://developer.mozilla.org/en/JavaScript_typed_arrays/ArrayBuffer
-     * https://developer.mozilla.org/en/JavaScript_typed_arrays/Uint8Array
-  
-    Copyright (c) 2011, Daniel Guerrero, BSD Licensed
-    */
-    var bytes = (input.length / 4) * 3;
-    var arraybuffer = new ArrayBuffer(bytes);
-    //get last chars to see if are valid
-    var lkey1 = base64_chars.indexOf(input.charAt(input.length - 1));
-    var lkey2 = base64_chars.indexOf(input.charAt(input.length - 2));
-    if (lkey1 == 64)
-        bytes--; //padding chars, so skip
-    if (lkey2 == 64)
-        bytes--; //padding chars, so skip
-    var chr1, chr2, chr3;
-    var enc1, enc2, enc3, enc4;
-    var i = 0;
-    var j = 0;
-    var uarray = new Uint8Array(arraybuffer);
-    input = input.replace(/[^A-Za-z0-9\+\/\=]/g, "");
-    for (i = 0; i < bytes; i += 3) {
-        //get the 3 octects in 4 ascii chars
-        enc1 = base64_chars.indexOf(input.charAt(j++));
-        enc2 = base64_chars.indexOf(input.charAt(j++));
-        enc3 = base64_chars.indexOf(input.charAt(j++));
-        enc4 = base64_chars.indexOf(input.charAt(j++));
-        chr1 = (enc1 << 2) | (enc2 >> 4);
-        chr2 = ((enc2 & 15) << 4) | (enc3 >> 2);
-        chr3 = ((enc3 & 3) << 6) | enc4;
-        uarray[i] = chr1;
-        if (enc3 != 64)
-            uarray[i + 1] = chr2;
-        if (enc4 != 64)
-            uarray[i + 2] = chr3;
-    }
-    return arraybuffer;
-}
-exports.decodeArrayBuffer = decodeArrayBuffer;
-
-},{}],2:[function(require,module,exports){
 // unicode character equivalents in the Symbol font
 // thanks to http://en.wikipedia.org/wiki/Symbol_%28typeface%29
 exports.symbol = {
@@ -528,8 +419,22 @@ exports.wingdings = {
     255: '(Windows logo – no equivalent)',
 };
 
-},{}],3:[function(require,module,exports){
+},{}],2:[function(require,module,exports){
 /// <reference path="../type_declarations/index.d.ts" />
+var __extends = this.__extends || function (d, b) {
+    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
+    function __() { this.constructor = d; }
+    __.prototype = b.prototype;
+    d.prototype = new __();
+};
+if (typeof __decorate !== "function") __decorate = function (decorators, target, key, desc) {
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") return Reflect.decorate(decorators, target, key, desc);
+    switch (arguments.length) {
+        case 2: return decorators.reduceRight(function(o, d) { return (d && d(o)) || o; }, target);
+        case 3: return decorators.reduceRight(function(o, d) { return (d && d(target, key)), void 0; }, void 0);
+        case 4: return decorators.reduceRight(function(o, d) { return (d && d(target, key, o)) || o; }, desc);
+    }
+};
 /**
 This module should be used for parsing Microsoft OpenXML documents.
 
@@ -548,35 +453,25 @@ function eachChildElement(node, func) {
         }
     }
 }
-var Context = (function () {
-    function Context(footnotes, endnotes, style_stack) {
-        if (footnotes === void 0) { footnotes = {}; }
-        if (endnotes === void 0) { endnotes = {}; }
-        if (style_stack === void 0) { style_stack = [new adts.Set()]; }
-        this.footnotes = footnotes;
-        this.endnotes = endnotes;
-        this.style_stack = style_stack;
+var ComplexField = (function (_super) {
+    __extends(ComplexField, _super);
+    /** `childNodes` is a container of the nodes between the "separate" and the "end" markers */
+    function ComplexField() {
+        _super.call(this);
+        /** `separated` is set to true when w:fldChar[fldCharType="separate"] is reached. */
+        this.separated = false;
     }
-    Context.prototype.pushStyles = function (styles) {
-        if (styles === void 0) { styles = []; }
-        this.style_stack.push(new adts.Set(styles));
-    };
-    Context.prototype.popStyles = function () {
-        return this.style_stack.pop();
-    };
-    Context.prototype.setStyles = function (styles) {
-        this.style_stack[this.style_stack.length - 1] = styles;
-    };
-    Context.prototype.addStyles = function (styles) {
-        var top = this.style_stack[this.style_stack.length - 1];
-        this.setStyles(adts.Set.union([top, new adts.Set(styles)]));
-    };
-    Context.prototype.currentStyles = function () {
-        /** Returns set (as instance of S) */
-        return adts.Set.union(this.style_stack);
-    };
-    return Context;
-})();
+    return ComplexField;
+})(xdom.XNode);
+var Bookmark = (function (_super) {
+    __extends(Bookmark, _super);
+    function Bookmark(id, name) {
+        _super.call(this);
+        this.id = id;
+        this.name = name;
+    }
+    return Bookmark;
+})(xdom.XNode);
 /**
 parseXML takes an XML string and returns a DOM Level 2/3 Document:
 https://developer.mozilla.org/en-US/docs/Web/API/document
@@ -595,73 +490,13 @@ Drop the namespace part of a fully qualified name, e.g.:
 function dropNS(qualifiedName) {
     return qualifiedName.replace(/^.+:/, '');
 }
-/** Read the footnotes for a DocX document */
-function readFootnotes(document) {
-    var notes = {};
-    document.documentElement;
-    eachChildElement(document.documentElement, function (note) {
-        var id = note.getAttribute('w:id');
-        // each w:footnote has a bunch of w:p children, like a w:body
-        var context = new Context();
-        var container = readBody(note, context);
-        notes[id] = new xdom.XFootnote(container.childNodes);
-    });
-    return notes;
-}
-/** Read the endnotes for a DocX document */
-function readEndnotes(document) {
-    var notes = {};
-    eachChildElement(document.documentElement, function (note) {
-        var id = note.getAttribute('w:id');
-        // each w:endnote has a bunch of w:p children, like a w:body
-        var context = new Context();
-        var container = readBody(note, context);
-        notes[id] = new xdom.XEndnote(container.childNodes);
-    });
-    return notes;
-}
-/**
-Turns the simple docProps/core.xml format into a key-value mapping after
-dropping namespaces. core_document should be a DOM Document; returns a plan
-Javascript hash object.
-*/
-function readMetadata(core_document) {
-    var metadata = {};
-    eachChildElement(core_document.documentElement, function (child) {
-        var tag = dropNS(child.tagName);
-        metadata[tag] = child.textContent;
-    });
-    return metadata;
-}
-/**
-The word/_rels/document.xml.rels looks kind of like:
-
-    <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-      <Relationship Id="rId1"
-        Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml"
-        Target="../customXml/item1.xml"/>
-      ...
-      <Relationship Id="rId13"
-        Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink"
-        Target="http://dx.doi.org/10.1007/s11049-011-9137-1%20%20" TargetMode="External"/>
-    </Relationships>
-*/
-function readRelationships(relationships_document) {
-    var relationships = {};
-    eachChildElement(relationships_document.documentElement, function (child) {
-        var id = child.getAttribute('Id');
-        relationships[id] = child.getAttribute('Target');
-    });
-    return relationships;
-}
 /**
 `properties` is an rPr or pPr element
 
-Returns a set of style strings (like "bold" or "italic"), as an instance of
-S (from sets.js)
+Returns a bitstring of xdom.Style flags
 */
 function readProperties(properties) {
-    var styles = new adts.Set();
+    var styles = 0;
     // everything we care about will an immediate child of the rPr or pPr
     eachChildElement(properties, function (child) {
         var tag = dropNS(child.tagName);
@@ -670,22 +505,24 @@ function readProperties(properties) {
         //   <w:rPr><w:i/></w:rPr> or <w:rPr><w:i w:val='1' /></w:rPr>
         //   but not <w:rPr><w:i w:val='0'/></w:rPr>
         if (tag == 'i' && val != '0') {
-            styles._add('italic');
+            styles |= xdom.Style.Italic;
         }
         else if (tag == 'b' && val != '0') {
-            styles._add('bold');
+            styles |= xdom.Style.Bold;
         }
         else if (tag == 'vertAlign' && val == 'subscript') {
-            styles._add('subscript');
+            styles |= xdom.Style.Subscript;
         }
         else if (tag == 'vertAlign' && val == 'superscript') {
-            styles._add('superscript');
+            styles |= xdom.Style.Superscript;
         }
         else if (tag == 'position' && val == '-4') {
-            styles._add('subscript');
+            styles |= xdom.Style.Subscript;
         }
         else if (tag == 'position' && val == '6') {
-            styles._add('superscript');
+            styles |= xdom.Style.Superscript;
+        }
+        else if (tag == 'pStyle' && val == 'ListNumber') {
         }
         else {
         }
@@ -700,59 +537,89 @@ body will most often be a <w:body> element, but may also be a
 
 The returned node's .childNodes will be xdom.XParagraph objects.
 */
-function readBody(body, context) {
+function readBody(body, context, parser) {
     var container = new xdom.XNode();
     eachChildElement(body, function (paragraph_element) {
-        var node = readParagraph(paragraph_element, context);
+        var node = readParagraph(paragraph_element, context, parser);
         container.appendChild(node);
     });
     return container;
 }
-function readParagraph(paragraph_element, context) {
-    /** p should be a DOM Element <w:p> from the original Word document XML.
-  
-    returns a word.WordContainer, which will have a bunch of WordNode children
-    (which can then be joined based on style congruence)
-    */
+/**
+p should be a DOM Element <w:p> from the original Word document XML.
+
+returns a single xdom.XNode, which will have a bunch of XNode children
+(which can then be joined based on style congruence)
+*/
+function readParagraph(paragraph_element, context, parser) {
     var paragraph = new xdom.XParagraph();
-    context.pushStyles([]);
+    context.stylesStack.push(0);
     // we need to read w:p's children in a loop, because each w:p's is not a constituent
     eachChildElement(paragraph_element, function (child) {
         var tag = dropNS(child.tagName);
         if (tag == 'pPr') {
-            var styles = readProperties(child);
-            context.setStyles(styles);
+            context.stylesStack.top = readProperties(child);
         }
         else if (tag == 'r') {
-            readRun(child, context).forEach(function (node) { return paragraph.appendChild(node); });
+            // readRun will most often return a list of only one node
+            var nodes = readRun(child, context, parser);
+            // if we are within a complex field stack, we append to that rather than the current paragraph
+            if (context.complexFieldStack.top) {
+                // by the time we get to runs inside a complexField, `context.complexFieldStack.top.separated` should be true
+                context.complexFieldStack.top.appendChildren(nodes);
+            }
+            else {
+                paragraph.appendChildren(nodes);
+                // bookmarks are not exclusive -- they are merely onlookers
+                // TODO: should this capture complex field elements too?
+                if (context.bookmarkStack.top) {
+                    context.bookmarkStack.top.appendChildren(nodes);
+                }
+            }
         }
         else if (tag == 'hyperlink') {
             // hyperlinks are just wrappers around a single w:r that contains a w:t.
             // you can use the w:hyperlink[@r:id] value and _rels/document.xml.rels to resolve it,
             // but for now I just read the raw link
-            context.pushStyles(['hyperlink']);
+            // context.pushStyles(['hyperlink']);
             eachChildElement(child, function (hyperlink_child) {
-                readRun(hyperlink_child, context).forEach(function (node) { return paragraph.appendChild(node); });
+                readRun(hyperlink_child, context, parser).forEach(function (node) { return paragraph.appendChild(node); });
             });
-            context.popStyles();
         }
         else if (tag == 'proofErr') {
         }
-        else if (tag == 'bookmarkStart' || tag == 'bookmarkEnd') {
+        else if (tag == 'bookmarkStart') {
+            /*
+            These are strewn about, sometimes in p > &, sometimes everywhere else.
+      
+            <w:bookmarkStart w:id="0" w:name="_Ref415460256"></w:bookmarkStart>
+            <w:r w:rsidRPr="00B60E9F">
+              <w:t>Introduction</w:t>
+            </w:r>
+            <w:bookmarkEnd w:id="0"></w:bookmarkEnd>
+            */
+            context.bookmarkStack.push(new Bookmark(child.getAttribute('w:id'), child.getAttribute('w:name')));
+        }
+        else if (tag == 'bookmarkEnd') {
+            // hopefully bookmarks aren't cross-nested
+            var bookmark = context.bookmarkStack.pop();
+            parser.bookmarks[bookmark.name] = bookmark;
         }
         else {
             util_1.log('p > %s ignored', tag);
         }
     });
-    context.popStyles();
+    context.stylesStack.pop();
     return paragraph;
 }
-function readRun(run, context) {
-    /** Read the contents of a single w:r element as a list of XNodes
-    context is the mutable state Context object.
-    */
+/**
+Read the contents of a single w:r element (`run`) as a list of XNodes
+
+context is the mutable state Context object.
+*/
+function readRun(run, context, parser) {
     var nodes = [];
-    context.pushStyles();
+    context.stylesStack.push(0);
     // an <w:r> will generally contain only one interesting element besides rPr,
     //   e.g., text, footnote reference, endnote reference, or a symbol
     //   but we still iterate through them all; more elegant than multiple find()'s
@@ -760,19 +627,18 @@ function readRun(run, context) {
         var tag = dropNS(child.tagName);
         if (tag == 'rPr') {
             // presumably, the rPr will occur before anything else (it does in all the docx xml I've come across)
-            var styles = readProperties(child);
-            context.setStyles(styles);
+            context.stylesStack.top = readProperties(child);
         }
         else if (tag == 'footnoteReference') {
             var footnote_id = child.getAttribute('w:id');
             // log('r > footnoteReference #%s', footnote_id);
-            var footnote_node = context.footnotes[footnote_id];
+            var footnote_node = parser.footnotes[footnote_id];
             nodes.push(footnote_node);
         }
         else if (tag == 'endnoteReference') {
             var endnote_id = child.getAttribute('w:id');
             // log('r > endnoteReference #%s', endnote_id);
-            var endnote_node = context.endnotes[endnote_id];
+            var endnote_node = parser.endnotes[endnote_id];
             nodes.push(endnote_node);
         }
         else if (tag == 'sym') {
@@ -794,15 +660,15 @@ function readRun(run, context) {
             // if replacement is None:
             //     logger.critical('Could not find symbol in map: %r' % char)
             //     replacement = u'MISSING SYMBOL (%r)' % char
-            var sym_node = new xdom.XSpan(text, context.currentStyles());
+            var sym_node = new xdom.XNode([], text, context.currentStyles());
             nodes.push(sym_node);
         }
         else if (tag == 't') {
-            var t_node = new xdom.XSpan(child.textContent, context.currentStyles());
+            var t_node = new xdom.XNode([], child.textContent, context.currentStyles());
             nodes.push(t_node);
         }
         else if (tag == 'tab') {
-            var tab_node = new xdom.XSpan('\t', context.currentStyles());
+            var tab_node = new xdom.XNode([], '\t', context.currentStyles());
             nodes.push(tab_node);
         }
         else if (tag == 'instrText') {
@@ -813,37 +679,51 @@ function readRun(run, context) {
             // counters look like this:
             // ' LISTNUM  ' or ' LISTNUM Example ' but I think they refer to the same thing
             // I'm not sure what the ' \* MERGEFORMAT ' instructions are for
-            util_1.log('r > instrText:', child);
+            // log('r > instrText:', child);
             var text = child.textContent;
             var hyperlink_match = text.match(/ HYPERLINK "(.+)" \\t ".+"/);
             if (hyperlink_match) {
-                context.addStyles(['hyperlink', 'url=' + hyperlink_match[1]]);
+                util_1.log('Ignoring r > instrText hyperlink: "%s"', hyperlink_match[1]);
             }
-            var ref_match = text.match(/ REF (.+)/);
+            var ref_match = text.match(/^ REF (\S+) (.+) $/);
             if (ref_match) {
                 var ref = ref_match[1];
-                // prototype = Hyperlink('REF => %s' % ref, r_styles)
-                util_1.log('Ignoring REF-type', ref);
+                var flags = ref_match[2];
+                util_1.log("Setting complex field code to \"" + ref + "\" (ignoring flags: " + flags + ")");
+                // `context.complexFieldStateStack.top` should not be undefined, and
+                // `context.complexFieldStateStack.top.separated` should be false
+                context.complexFieldStack.top.code = ref;
             }
             var counter_match = text.match(/ LISTNUM (.*) $/);
             if (counter_match) {
-                context.addStyles(['counter', 'series=' + counter_match[1]]);
+                util_1.log('Ignoring r > instrText counter: "%s"', counter_match[1]);
             }
         }
         else if (tag == 'fldChar') {
+            // fldChar indicates a field character. The variable is specified between
+            // the 'begin' and 'separate' fldCharTypes (usually as instrText), and the
+            // current displayed value is specified between the 'separate' and 'end' types.
             var field_signal = child.getAttribute('w:fldCharType');
             if (field_signal == 'begin') {
-                util_1.log('r > fldChar: fldCharType=begin');
+                // log('r > fldChar: fldCharType=begin');
+                context.complexFieldStack.push(new ComplexField());
             }
             else if (field_signal == 'separate') {
-                util_1.log('r > fldChar: fldCharType=separate');
+                // log('r > fldChar: fldCharType=separate');
+                context.complexFieldStack.top.separated = true;
             }
             else if (field_signal == 'end') {
-                util_1.log('r > fldChar: fldCharType=end');
+                // log('r > fldChar: fldCharType=end');
+                var complexField = context.complexFieldStack.pop();
+                var bookmark = parser.bookmarks[complexField.code];
+                // new_style: `REF=${complexField.code}`
+                var field_node = new xdom.XNode(complexField.childNodes, null, context.currentStyles());
+                util_1.log('resolving fldChar REF code: "%s"', complexField.code);
+                util_1.log('field_node', field_node, 'bookmark', bookmark);
+                nodes.push(field_node);
             }
             else {
-                var message = 'r > fldChar: Unrecognized fldCharType: ' + field_signal;
-                throw new Error(message);
+                throw new Error("r > fldChar: Unrecognized fldCharType: " + field_signal);
             }
         }
         else if (tag == 'separator') {
@@ -858,48 +738,183 @@ function readRun(run, context) {
         }
         else if (tag == 'br') {
             // TODO: should this be a line break of some sort?
-            var break_node = new xdom.XSpan('\n', context.currentStyles());
+            var break_node = new xdom.XNode([], '\n', context.currentStyles());
             nodes.push(break_node);
         }
         else {
             util_1.log('r > %s ignored', tag); // , child
         }
     });
-    context.popStyles();
+    context.stylesStack.pop();
     return nodes;
 }
-function parseXDocument(arraybuffer) {
-    var zip = new JSZip(arraybuffer);
-    // footnotes and endnotes are objects keyed by the w:id value (an integer from 0 to 1)
-    // to an Array of spans
-    var footnotes_doc = parseXML(zip.file('word/footnotes.xml').asText());
-    var footnotes = readFootnotes(footnotes_doc);
-    var endnotes_doc = parseXML(zip.file('word/endnotes.xml').asText());
-    var endnotes = readEndnotes(endnotes_doc);
-    var context = new Context(footnotes, endnotes);
-    // relationships is a mapping from Id's to Target's
-    var relationships_doc = parseXML(zip.file('word/_rels/document.xml.rels').asText());
-    var relationships = readRelationships(relationships_doc);
-    // metadata is a mapping
-    var core_document = parseXML(zip.file('docProps/core.xml').asText());
-    var metadata = readMetadata(core_document);
-    var doc = new xdom.XDocument([], metadata);
-    var main_document = parseXML(zip.file('word/document.xml').asText());
-    util_1.log('Reading document.xml');
-    // the root element of the word/document.xml document is a w:document
-    var main_document_root = main_document.documentElement;
-    // w:document should have one child element: w:body
-    var main_document_body = main_document_root.firstElementChild;
-    // body.children is a bunch of <w:p> elements, paragraphs
-    eachChildElement(main_document_body, function (childNode) {
-        var paragraph_node = readParagraph(childNode, context);
-        doc.appendChild(paragraph_node);
+var Context = (function () {
+    function Context() {
+        this.complexFieldStack = new adts.Stack();
+        this.stylesStack = new adts.Stack();
+        this.bookmarkStack = new adts.Stack();
+    }
+    /** Combines all styles in the stack */
+    Context.prototype.currentStyles = function () {
+        return this.stylesStack.getElements().reduce(function (a, b) { return a | b; }, 0);
+    };
+    return Context;
+})();
+var Parser = (function () {
+    function Parser(arraybuffer, zip) {
+        if (zip === void 0) { zip = new JSZip(arraybuffer); }
+        this.zip = zip;
+        /** bookmarks are indexed by their name, not their id */
+        this.bookmarks = {};
+    }
+    Object.defineProperty(Parser.prototype, "document", {
+        get: function () {
+            var _this = this;
+            var doc = new xdom.XDocument(this.metadata);
+            // the root element of the word/document.xml document is a w:document, which
+            // should have one child element, w:body, whose children are a bunch of
+            // <w:p> elements (paragraphs)
+            var file = this.zip.file('word/document.xml');
+            var documentBody = parseXML(file.asText()).documentElement.firstElementChild;
+            eachChildElement(documentBody, function (childNode) {
+                var context = new Context();
+                var paragraph_node = readParagraph(childNode, context, _this);
+                doc.appendChild(paragraph_node);
+            });
+            return doc;
+        },
+        enumerable: true,
+        configurable: true
     });
-    return doc;
-}
-exports.parseXDocument = parseXDocument;
+    Object.defineProperty(Parser.prototype, "footnotes", {
+        /**
+        Read the footnotes for a Word document
+      
+        `footnotes` returns a mapping from the footnote's w:id value (an integer
+        string), to an XNode-inheriting container of the footnote's contents.
+        */
+        get: function () {
+            var _this = this;
+            var footnotes = {};
+            var file = this.zip.file('word/footnotes.xml');
+            // The footnotes.xml file may not exist.
+            if (file) {
+                var document = parseXML(file.asText());
+                eachChildElement(document.documentElement, function (note) {
+                    var id = note.getAttribute('w:id');
+                    // each w:footnote has a bunch of w:p children, like a w:body
+                    var context = new Context();
+                    var container = readBody(note, context, _this);
+                    footnotes[id] = new xdom.XFootnote(container.childNodes);
+                });
+            }
+            return footnotes;
+        },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(Parser.prototype, "endnotes", {
+        /**
+        Read the endnotes for a Word document
+        */
+        get: function () {
+            var _this = this;
+            var endnotes = {};
+            var file = this.zip.file('word/endnotes.xml');
+            // The endnotes.xml file may not exist.
+            if (file) {
+                var document = parseXML(file.asText());
+                eachChildElement(document.documentElement, function (note) {
+                    var id = note.getAttribute('w:id');
+                    var context = new Context();
+                    var container = readBody(note, context, _this);
+                    endnotes[id] = new xdom.XFootnote(container.childNodes);
+                });
+            }
+            return endnotes;
+        },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(Parser.prototype, "metadata", {
+        /**
+        Turns the simple docProps/core.xml format into a key-value mapping after
+        dropping namespaces. core_document should be a DOM Document; returns a plan
+        Javascript hash object.
+      
+        metadata is a mapping from metadata keys to their string values.
+        the keys will be things like 'title', 'creator', 'keywords', 'revision',
+        along with several other dates / names
+        */
+        get: function () {
+            var metadata = {};
+            var file = this.zip.file('docProps/core.xml');
+            // In case the file does not exist:
+            if (file) {
+                var document = parseXML(file.asText());
+                eachChildElement(document.documentElement, function (child) {
+                    var tag = dropNS(child.tagName);
+                    metadata[tag] = child.textContent;
+                });
+            }
+            return metadata;
+        },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(Parser.prototype, "relationships", {
+        /**
+        The word/_rels/document.xml.rels looks kind of like:
+      
+            <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+              <Relationship Id="rId1"
+                Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml"
+                Target="../customXml/item1.xml"/>
+              ...
+              <Relationship Id="rId13"
+                Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink"
+                Target="http://dx.doi.org/10.1007/s11049-011-9137-1%20%20" TargetMode="External"/>
+            </Relationships>
+      
+        relationships is a mapping from `Id`s to `Target`s
+        */
+        get: function () {
+            var relationships = {};
+            var file = this.zip.file('word/_rels/document.xml.rels');
+            // In case the file does not exist:
+            if (file) {
+                var document = parseXML(file.asText());
+                eachChildElement(document.documentElement, function (child) {
+                    var id = child.getAttribute('Id');
+                    relationships[id] = child.getAttribute('Target');
+                });
+            }
+            return relationships;
+        },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(Parser.prototype, "footnotes",
+        __decorate([
+            util_1.memoize
+        ], Parser.prototype, "footnotes", Object.getOwnPropertyDescriptor(Parser.prototype, "footnotes")));
+    Object.defineProperty(Parser.prototype, "endnotes",
+        __decorate([
+            util_1.memoize
+        ], Parser.prototype, "endnotes", Object.getOwnPropertyDescriptor(Parser.prototype, "endnotes")));
+    Object.defineProperty(Parser.prototype, "metadata",
+        __decorate([
+            util_1.memoize
+        ], Parser.prototype, "metadata", Object.getOwnPropertyDescriptor(Parser.prototype, "metadata")));
+    Object.defineProperty(Parser.prototype, "relationships",
+        __decorate([
+            util_1.memoize
+        ], Parser.prototype, "relationships", Object.getOwnPropertyDescriptor(Parser.prototype, "relationships")));
+    return Parser;
+})();
+exports.Parser = Parser;
 
-},{"../characters":2,"../util":83,"../xdom":84,"adts":4,"jszip":18}],4:[function(require,module,exports){
+},{"../characters":1,"../util":83,"../xdom":84,"adts":3,"jszip":18}],3:[function(require,module,exports){
 /**
 Bag: a multiset; i.e., a Set with counts. The underlying datatype
 is a object, `._element_object`. The effective default of members
@@ -1147,9 +1162,11 @@ var Set = (function () {
     return Set;
 })();
 exports.Set = Set;
-/** new Stack<T>(elements?: T[])
+/**
+A simplified Array wrapper. Differences:
 
-Basically a simplified Array wrapper, with Stack#bottom and Stack#top getters.
+* Provides `top` and `bottom` getters/setters
+* Renames `length` to `size`
 
 When initialized with an Array, the last element in the array will be the top of
 the Stack. The constructor's elements argment is optional, and defaults to an
@@ -1158,42 +1175,75 @@ empty array.
 var Stack = (function () {
     function Stack(elements) {
         if (elements === void 0) { elements = []; }
-        this._array = elements;
+        this.elements = elements;
     }
-    Object.defineProperty(Stack.prototype, "length", {
-        /** Stack#length
-      
-        Returns size of stack.
+    /**
+    Returns the contents of the stack, from bottom to top.
+    */
+    Stack.prototype.getElements = function () {
+        return this.elements;
+    };
+    Object.defineProperty(Stack.prototype, "size", {
+        /**
+        Return the size (length) of the stack.
         */
         get: function () {
-            return this._array.length;
+            return this.elements.length;
         },
         enumerable: true,
         configurable: true
     });
-    /** Stack#push(element)
-  
-    Returns size of stack after adding element.
+    /**
+    Add a new element to the top of the stack and return the new size of the stack.
     */
     Stack.prototype.push = function (element) {
-        return this._array.push(element);
+        return this.elements.push(element);
     };
+    /**
+    Remove the element at the top of the stack and return it.
+  
+    Returns undefined if the stack is empty.
+    */
     Stack.prototype.pop = function () {
-        return this._array.pop();
+        return this.elements.pop();
     };
     Object.defineProperty(Stack.prototype, "bottom", {
+        /**
+        Retrieve the bottom element of the stack.
+      
+        Returns undefined if the stack is empty.
+        */
         get: function () {
-            return this._array[0];
+            return this.elements[0];
+        },
+        /**
+        Replace the bottom element of the stack.
+      
+        Has the same effect as `Stack#push(element)` if the stack is empty.
+        */
+        set: function (element) {
+            this.elements[0] = element;
         },
         enumerable: true,
         configurable: true
     });
-    Stack.prototype.peek = function () {
-        return this._array[this._array.length - 1];
-    };
     Object.defineProperty(Stack.prototype, "top", {
+        /**
+        Retrieve the top element of the stack.
+      
+        Returns undefined if the stack is empty.
+        */
         get: function () {
-            return this._array[this._array.length - 1];
+            return this.elements[this.elements.length - 1];
+        },
+        /**
+        Replace the top element of the stack.
+      
+        Has the same effect as `Stack#push(element)` if the stack is empty.
+        */
+        set: function (element) {
+            var index = Math.max(this.elements.length - 1, 0);
+            this.elements[index] = element;
         },
         enumerable: true,
         configurable: true
@@ -1202,9 +1252,9 @@ var Stack = (function () {
 })();
 exports.Stack = Stack;
 
-},{}],5:[function(require,module,exports){
+},{}],4:[function(require,module,exports){
 
-},{}],6:[function(require,module,exports){
+},{}],5:[function(require,module,exports){
 /*!
  * The buffer module from node.js, for the browser.
  *
@@ -2620,7 +2670,7 @@ function decodeUtf8Char (str) {
   }
 }
 
-},{"base64-js":7,"ieee754":8,"is-array":9}],7:[function(require,module,exports){
+},{"base64-js":6,"ieee754":7,"is-array":8}],6:[function(require,module,exports){
 var lookup = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
 ;(function (exports) {
@@ -2746,7 +2796,7 @@ var lookup = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 	exports.fromByteArray = uint8ToBase64
 }(typeof exports === 'undefined' ? (this.base64js = {}) : exports))
 
-},{}],8:[function(require,module,exports){
+},{}],7:[function(require,module,exports){
 exports.read = function (buffer, offset, isLE, mLen, nBytes) {
   var e, m,
       eLen = nBytes * 8 - mLen - 1,
@@ -2832,7 +2882,7 @@ exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
   buffer[offset + i - d] |= s * 128
 }
 
-},{}],9:[function(require,module,exports){
+},{}],8:[function(require,module,exports){
 
 /**
  * isArray
@@ -2866,6 +2916,166 @@ var str = Object.prototype.toString;
 module.exports = isArray || function (val) {
   return !! val && '[object Array]' == str.call(val);
 };
+
+},{}],9:[function(require,module,exports){
+var coders;
+(function (coders) {
+    var base64;
+    (function (base64) {
+        /**
+        Copyright 2015, Christopher Brown <io@henrian.com>, MIT Licensed
+        
+        Encoding takes us from the raw source to a more obscure format.
+        Decoding gets us from that format back to the raw source.
+        
+        In the case of base64, the raw (unencoded) source is an array of bytes, and the
+        obscured (encoded) format is the base64 string.
+        */
+        base64.STANDARD_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+        function makeString(charCodes) {
+            return String.fromCharCode.apply(null, charCodes);
+        }
+        base64.makeString = makeString;
+        function unmakeString(str) {
+            var length = str.length;
+            var charCodes = new Array(length);
+            for (var i = 0; i < length; i++) {
+                charCodes[i] = str.charCodeAt(i);
+            }
+            return charCodes;
+        }
+        base64.unmakeString = unmakeString;
+        /**
+        Convert a Uint8Array or Array of numbers (in which case each element should be
+        in the range 0-255) and returns an Array of numbers in the range 0-64.
+        
+        Mostly from https://gist.github.com/jonleighton/958841, benchmarks at
+        http://jsperf.com/encoding-xhr-image-data/5
+        */
+        function encode(bytes) {
+            var bytes_length = bytes.length;
+            var byte_remainder = bytes_length % 3;
+            var string_length = bytes_length - byte_remainder;
+            var a, b, c, d;
+            var chunk;
+            var indices = [];
+            // Main loop deals with bytes in chunks of 3
+            for (var i = 0; i < string_length; i += 3) {
+                // Combine the three bytes into a single integer
+                chunk = (bytes[i] << 16) | (bytes[i + 1] << 8) | bytes[i + 2];
+                // Use bitmasks to extract 6-bit segments from the triplet
+                a = (chunk & 16515072) >> 18; // 16515072 = (2^6 - 1) << 18
+                b = (chunk & 258048) >> 12; // 258048   = (2^6 - 1) << 12
+                c = (chunk & 4032) >> 6; // 4032     = (2^6 - 1) << 6
+                d = chunk & 63; // 63       = 2^6 - 1
+                // Convert the raw binary segments to the appropriate ASCII encoding
+                indices.push(a, b, c, d);
+            }
+            // Deal with the remaining bytes and padding
+            if (byte_remainder == 1) {
+                chunk = bytes[string_length];
+                a = (chunk & 252) >> 2; // 252 = (2^6 - 1) << 2
+                // Set the 4 least significant bits to zero
+                b = (chunk & 3) << 4; // 3   = 2^2 - 1
+                indices.push(a, b, 64, 64);
+            }
+            else if (byte_remainder == 2) {
+                chunk = (bytes[string_length] << 8) | bytes[string_length + 1];
+                a = (chunk & 64512) >> 10; // 64512 = (2^6 - 1) << 10
+                b = (chunk & 1008) >> 4; // 1008  = (2^6 - 1) << 4
+                // Set the 2 least significant bits to zero
+                c = (chunk & 15) << 2; // 15    = 2^4 - 1
+                indices.push(a, b, c, 64);
+            }
+            // otherwise: no padding required
+            return indices;
+        }
+        base64.encode = encode;
+        /**
+        Convert a Uint8Array or Array of numbers (in which case each element should be
+        in the range 0-255) and returns a native Javascript string representation of
+        the bytes in base64.
+        
+        Mostly from https://gist.github.com/jonleighton/958841, benchmarks at
+        http://jsperf.com/encoding-xhr-image-data/5
+        
+        `alphabet` should contain 65 characters, where `alphabet[64]` is the padding
+        character.
+        */
+        function encodeStringToString(raw_string, alphabet) {
+            if (alphabet === void 0) { alphabet = base64.STANDARD_ALPHABET; }
+            var bytes = unmakeString(raw_string);
+            return encodeBytesToString(bytes, alphabet);
+        }
+        base64.encodeStringToString = encodeStringToString;
+        function encodeBytesToString(bytes, alphabet) {
+            if (alphabet === void 0) { alphabet = base64.STANDARD_ALPHABET; }
+            var indices = encode(bytes);
+            return indices.map(function (i) { return alphabet[i]; }).join('');
+        }
+        base64.encodeBytesToString = encodeBytesToString;
+        /**
+        Decode an Array of numbers in the range 0-64 to an Array of numbers in the range
+        0-255 (i.e., byte-sized).
+        
+        Based on https://github.com/danguer/blog-examples/blob/master/js/base64-binary.js,
+        which is Copyright 2011, Daniel Guerrero, BSD Licensed.
+        */
+        function decode(indices) {
+            var length = indices.length;
+            var bytes = [];
+            for (var index = 0; index < length; index += 4) {
+                // get the values of the next 4 base64 chars
+                var c1 = indices[index];
+                var c2 = indices[index + 1];
+                var c3 = indices[index + 2];
+                var c4 = indices[index + 3];
+                // and derive the original bytes from them
+                var b1 = (c1 << 2) | (c2 >> 4);
+                var b2 = ((c2 & 15) << 4) | (c3 >> 2);
+                var b3 = ((c3 & 3) << 6) | c4;
+                // detect padding chars and adjust final length accordingly
+                if (c4 === 64) {
+                    if (c3 === 64) {
+                        // 2 padding bytes
+                        bytes.push(b1);
+                    }
+                    else {
+                        // 1 padding byte
+                        bytes.push(b1, b2);
+                    }
+                }
+                else {
+                    // no padding
+                    bytes.push(b1, b2, b3);
+                }
+            }
+            return bytes;
+        }
+        base64.decode = decode;
+        /**
+        Decode a base64-encoded Javascript string into an array of numbers, all of will
+        be in the range 0-255 (i.e., byte-sized).
+        
+        Based on https://github.com/danguer/blog-examples/blob/master/js/base64-binary.js,
+        which is Copyright 2011, Daniel Guerrero, BSD Licensed.
+        */
+        function decodeStringToString(base64_string, alphabet) {
+            if (alphabet === void 0) { alphabet = base64.STANDARD_ALPHABET; }
+            var charCodes = decodeStringToBytes(base64_string, alphabet);
+            return makeString(charCodes);
+        }
+        base64.decodeStringToString = decodeStringToString;
+        function decodeStringToBytes(base64_string, alphabet) {
+            if (alphabet === void 0) { alphabet = base64.STANDARD_ALPHABET; }
+            // TODO: optimize this with a for loop and an alphabet hashtable
+            var indices = base64_string.split('').map(function (character) { return alphabet.indexOf(character); });
+            return decode(indices);
+        }
+        base64.decodeStringToBytes = decodeStringToBytes;
+    })(base64 = coders.base64 || (coders.base64 = {}));
+})(coders || (coders = {}));
+module.exports = coders;
 
 },{}],10:[function(require,module,exports){
 'use strict';
@@ -3460,7 +3670,7 @@ module.exports.test = function(b){
 };
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":6}],21:[function(require,module,exports){
+},{"buffer":5}],21:[function(require,module,exports){
 'use strict';
 var Uint8ArrayReader = require('./uint8ArrayReader');
 
@@ -4484,7 +4694,7 @@ else {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":6}],27:[function(require,module,exports){
+},{"buffer":5}],27:[function(require,module,exports){
 'use strict';
 var DataReader = require('./dataReader');
 
@@ -12242,7 +12452,7 @@ if (typeof document !== 'undefined') {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"min-document":5}],58:[function(require,module,exports){
+},{"min-document":4}],58:[function(require,module,exports){
 "use strict";
 
 module.exports = function isObject(x) {
@@ -13675,6 +13885,22 @@ function appendPatch(apply, patch) {
 
 },{"../vnode/handle-thunk":71,"../vnode/is-thunk":72,"../vnode/is-vnode":74,"../vnode/is-vtext":75,"../vnode/is-widget":76,"../vnode/vpatch":79,"./diff-props":81,"x-is-array":59}],83:[function(require,module,exports){
 exports.log = console.log.bind(console);
+/**
+Search the codebase for @util.memoize or @memoize for usage examples.
+*/
+function memoize(target, propertyKey, descriptor) {
+    var get = descriptor.get;
+    var memoizedPropertyKey = "_memoized_" + propertyKey;
+    descriptor.get = function () {
+        var got = memoizedPropertyKey in this;
+        if (!got) {
+            this[memoizedPropertyKey] = get.call(this);
+        }
+        return this[memoizedPropertyKey];
+    };
+    return descriptor;
+}
+exports.memoize = memoize;
 
 },{}],84:[function(require,module,exports){
 var __extends = this.__extends || function (d, b) {
@@ -13684,25 +13910,67 @@ var __extends = this.__extends || function (d, b) {
     d.prototype = new __();
 };
 var virtual_dom_1 = require('virtual-dom');
+// We can do bitwise math in Javascript up to 2^29, so we can have up to
+// 29 styles
+// 2 << 29 ==  1073741824 == 2^30
+// 2 << 30 == -2147483648 != 2^31
+(function (Style) {
+    Style[Style["Bold"] = 1] = "Bold";
+    Style[Style["Italic"] = 2] = "Italic";
+    Style[Style["Underline"] = 4] = "Underline";
+    Style[Style["Subscript"] = 8] = "Subscript";
+    Style[Style["Superscript"] = 16] = "Superscript";
+})(exports.Style || (exports.Style = {}));
+var Style = exports.Style;
 /**
 A fragment of a Document model; can be either a container,
 or, when extended, a node with some semantic role in a document.
 */
 var XNode = (function () {
-    function XNode(childNodes) {
+    function XNode(childNodes, textContent, styles) {
         if (childNodes === void 0) { childNodes = []; }
+        if (textContent === void 0) { textContent = null; }
+        if (styles === void 0) { styles = 0; }
         this.childNodes = childNodes;
+        this.textContent = textContent;
+        this.styles = styles;
     }
+    XNode.prototype.getProperties = function () {
+        // could be CSSStyleDeclaration but all the properties are required
+        var style = {};
+        if (this.styles & Style.Italic) {
+            style.fontStyle = 'italic';
+        }
+        if (this.styles & Style.Bold) {
+            style.fontWeight = 'bold';
+        }
+        if (this.styles & Style.Underline) {
+            style.textDecoration = 'underline';
+        }
+        // it'd be weird if something was both subscript and superscript, but maybe?
+        if (this.styles & Style.Subscript) {
+            style.verticalAlign = 'sub';
+            style.fontSize = 'xx-small';
+        }
+        if (this.styles & Style.Superscript) {
+            style.verticalAlign = 'super';
+            style.fontSize = 'xx-small';
+        }
+        // use `|| undefined` to avoid creating an empty title attribute
+        var title = undefined; // this.styles.toJSON().join('; ') ||
+        return { style: style, title: title };
+    };
+    XNode.prototype.getContent = function () {
+        return this.textContent ? this.textContent : this.childNodes.map(function (childNode) { return childNode.toVNode(); });
+    };
     XNode.prototype.toVNode = function () {
-        if (this.textContent) {
-            return virtual_dom_1.h('span', this.textContent);
-        }
-        else {
-            return virtual_dom_1.h('span', this.childNodes.map(function (childNode) { return childNode.toVNode(); }));
-        }
+        return virtual_dom_1.h('span', this.getProperties(), this.getContent());
     };
     XNode.prototype.appendChild = function (newChild) {
         this.childNodes.push(newChild);
+    };
+    XNode.prototype.appendChildren = function (newChildren) {
+        Array.prototype.push.apply(this.childNodes, newChildren);
     };
     /** modifies this WordContainer's children so that contiguous WordSpan
     objects with the congruent styles are merged into a single WordSpan.
@@ -13779,19 +14047,15 @@ var XParagraph = (function (_super) {
     a div.paragraph, rather than a document fragment
     */
     XParagraph.prototype.toVNode = function () {
-        return virtual_dom_1.h('div.paragraph', this.childNodes.map(function (childNode) { return childNode.toVNode(); }));
-    };
-    /** Returns a string */
-    XParagraph.prototype.toTeX = function () {
-        throw new Error('Not yet implemented');
+        return virtual_dom_1.h('div.paragraph', this.getProperties(), this.getContent());
     };
     return XParagraph;
 })(XNode);
 exports.XParagraph = XParagraph;
 var XDocument = (function (_super) {
     __extends(XDocument, _super);
-    function XDocument(childNodes, metadata) {
-        _super.call(this, childNodes);
+    function XDocument(metadata) {
+        _super.call(this);
         this.metadata = metadata;
     }
     return XDocument;
@@ -13800,34 +14064,16 @@ exports.XDocument = XDocument;
 /**
 XSpan is the basic text block of a document, associated with a single
 basic string and maybe some styles.
+
+childNodes should always be empty.
 */
-var XSpan = (function (_super) {
-    __extends(XSpan, _super);
-    function XSpan(textContent, styles) {
-        _super.call(this);
-        this.textContent = textContent;
-        this.styles = styles;
-    }
-    XSpan.prototype.toVNode = function () {
-        var classList = [];
-        if (this.styles.contains('italic')) {
-            classList.push('italic');
-        }
-        if (this.styles.contains('bold')) {
-            classList.push('bold');
-        }
-        return virtual_dom_1.h('span', { className: classList.join(' ') }, [this.textContent]);
-    };
-    return XSpan;
-})(XNode);
-exports.XSpan = XSpan;
 var XFootnote = (function (_super) {
     __extends(XFootnote, _super);
     function XFootnote() {
         _super.apply(this, arguments);
     }
     XFootnote.prototype.toVNode = function () {
-        return virtual_dom_1.h('div.footnote', [_super.prototype.toVNode.call(this)]);
+        return virtual_dom_1.h('span.footnote', this.getProperties(), this.getContent());
     };
     return XFootnote;
 })(XNode);
@@ -13838,7 +14084,7 @@ var XEndnote = (function (_super) {
         _super.apply(this, arguments);
     }
     XEndnote.prototype.toVNode = function () {
-        return virtual_dom_1.h('div.endnote', [_super.prototype.toVNode.call(this)]);
+        return virtual_dom_1.h('span.endnote', this.getProperties(), this.getContent());
     };
     return XEndnote;
 })(XNode);
@@ -13847,8 +14093,9 @@ exports.XEndnote = XEndnote;
 },{"virtual-dom":52}],85:[function(require,module,exports){
 /// <reference path="type_declarations/index.d.ts" />
 var virtual_dom_1 = require('virtual-dom');
+var JSZip = require('jszip');
 var docx = require('./formats/docx');
-var base64 = require('./base64');
+var coders_1 = require('coders');
 var util_1 = require('./util');
 var Types = {};
 function raiseObject(obj) {
@@ -13907,6 +14154,16 @@ app.config(function ($stateProvider, $urlRouterProvider) {
         url: '/word',
         templateUrl: 'templates/word.html',
         controller: 'wordCtrl',
+    })
+        .state('word.file', {
+        url: '/files/:name',
+        templateUrl: 'templates/word_file.html',
+        controller: 'wordFileCtrl',
+    })
+        .state('xdoc', {
+        url: '/xdoc',
+        templateUrl: 'templates/xdoc.html',
+        controller: 'xdocCtrl',
     });
     // .state('validate', {
     //   url: '/validate',
@@ -13934,54 +14191,65 @@ var LocalFile = (function () {
         this.type = type;
         this.lastModifiedDate = lastModifiedDate;
         this.arraybuffer = arraybuffer;
-        this.toJSON = function () {
-            return {
-                __type__: 'LocalFile',
-                name: this.name,
-                size: this.size,
-                type: this.type,
-                lastModifiedDate: this.lastModifiedDate,
-                data: base64.encodeArrayBuffer(this.arraybuffer),
-            };
-        };
     }
     LocalFile.fromJSON = function (obj) {
-        var arraybuffer = base64.decodeArrayBuffer(obj.data);
+        var base64_string = obj.data;
+        var bytes = coders_1.base64.decodeStringToBytes(base64_string);
+        var arraybuffer = new Uint8Array(bytes).buffer;
         return new LocalFile(obj.name, obj.size, obj.type, obj.lastModifiedDate, arraybuffer);
+    };
+    LocalFile.prototype.toJSON = function () {
+        var bytes = new Uint8Array(this.arraybuffer);
+        return {
+            __type__: 'LocalFile',
+            name: this.name,
+            size: this.size,
+            type: this.type,
+            lastModifiedDate: this.lastModifiedDate,
+            data: coders_1.base64.encodeBytesToString(bytes),
+        };
     };
     return LocalFile;
 })();
 // angular-ext.js hack
 Types['LocalFile'] = LocalFile;
-app.controller('wordCtrl', function ($scope, $http, $flash, $localStorage) {
+app.controller('wordCtrl', function ($scope, $localStorage) {
     $scope.$storage = $localStorage;
-    var upload_el = document.querySelector('input[type="file"]');
-    angular.element(upload_el).on('change', function (ev) {
-        $scope.$apply(function () {
-            var input = ev.target;
-            var file = input.files[0];
-            // sample file = {
-            //   lastModifiedDate: Tue Mar 04 2014 15:57:25 GMT-0600 (CST)
-            //   name: "asch-stims.xlsx"
-            //   size: 34307
-            //   type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            //   webkitRelativePath: ""
-            // }
-            $scope.$storage.file = new LocalFile(file.name, file.size, file.type, file.lastModifiedDate);
-            readFileAsArrayBuffer(file, function (err, arraybuffer) {
-                if (err) {
-                    return $flash('Error reading file ' + file.name);
-                }
-                $scope.$apply(function () {
-                    $scope.$storage.file.arraybuffer = arraybuffer;
-                });
+    $scope.readFile = function (file) {
+        // sample file = {
+        //   lastModifiedDate: Tue Mar 04 2014 15:57:25 GMT-0600 (CST)
+        //   name: "asch-stims.xlsx"
+        //   size: 34307
+        //   type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        //   webkitRelativePath: ""
+        // }
+        $scope.$storage.file = new LocalFile(file.name, file.size, file.type, file.lastModifiedDate);
+        readFileAsArrayBuffer(file, function (err, arraybuffer) {
+            $scope.$apply(function () {
+                if (err)
+                    throw err;
+                $scope.$storage.file.arraybuffer = arraybuffer;
             });
         });
+    };
+    $scope.$watch('$storage.file.arraybuffer', function (arraybuffer) {
+        if (arraybuffer && arraybuffer.byteLength > 0) {
+            $scope.zip = new JSZip(arraybuffer);
+        }
     });
-    $scope.$watch('$storage.file.arraybuffer', function (new_arraybuffer, old_arraybuffer) {
-        if (new_arraybuffer && new_arraybuffer.byteLength > 0) {
-            $scope.document = docx.parseXDocument(new_arraybuffer);
-            console.log('document', $scope.document);
+});
+app.controller('wordFileCtrl', function ($scope, $state, $localStorage) {
+    $scope.$storage = $localStorage;
+    var zip = new JSZip($scope.$storage.file.arraybuffer);
+    var file = $scope.file = zip.file($state.params.name);
+    var text = $scope.text = file.asText();
+});
+app.controller('xdocCtrl', function ($scope, $localStorage) {
+    $scope.$storage = $localStorage;
+    $scope.$watch('$storage.file.arraybuffer', function (arraybuffer) {
+        if (arraybuffer && arraybuffer.byteLength > 0) {
+            var parser = new docx.Parser(arraybuffer);
+            $scope.document = parser.document;
         }
     });
 });
@@ -13992,11 +14260,9 @@ app.directive('xdomDocument', function () {
             xdomDocument: '=',
         },
         link: function (scope, el) {
-            util_1.log('linking', scope);
             var element;
             var vtree;
             function update(xDocument) {
-                util_1.log('updating ', xDocument);
                 if (vtree === undefined) {
                     vtree = xDocument.toVNode();
                     element = virtual_dom_1.create(vtree);
@@ -14018,5 +14284,74 @@ app.directive('xdomDocument', function () {
         }
     };
 });
+function mapNodes(nodes, func) {
+    var result = [];
+    for (var i = 0, node; (node = nodes[i]); i++) {
+        result.push(func(node));
+    }
+    return result;
+}
+function mapAttributes(attributes, func) {
+    var result = [];
+    for (var i = 0, attr; (attr = attributes[i]); i++) {
+        result.push(func(attr));
+    }
+    return result;
+}
+function renderAttributes(attributes) {
+    return mapAttributes(attributes, function (attr) { return virtual_dom_1.h('span.attribute', [' ', virtual_dom_1.h('span.name', attr.name), '=', virtual_dom_1.h('span.value', "\"" + attr.value + "\"")]); });
+}
+function renderXmlNodes(nodes) {
+    return mapNodes(nodes, function (node) { return renderXmlNode(node); });
+}
+function renderXmlNode(node) {
+    if (node.nodeType == Node.TEXT_NODE) {
+        var text = node;
+        return virtual_dom_1.h('div.text', text.data);
+    }
+    else if (node.nodeType == Node.ELEMENT_NODE) {
+        var element = node;
+        var tagName = element.tagName;
+        var startTagChildren = ['<', tagName];
+        startTagChildren = startTagChildren.concat(renderAttributes(element.attributes)).concat('>');
+        var startTag = virtual_dom_1.h('span.start', startTagChildren);
+        var endTag = virtual_dom_1.h('span.end', {}, ['</', tagName, '>']);
+        return virtual_dom_1.h('div.element', [startTag, renderXmlNodes(node.childNodes), endTag]);
+    }
+    else {
+        return virtual_dom_1.h('span', "(Ignoring node type = " + node.nodeType + ")");
+    }
+}
+app.directive('xmlTree', function () {
+    return {
+        restrict: 'E',
+        scope: {
+            xml: '=',
+        },
+        link: function (scope, el) {
+            var element;
+            var vtree;
+            function update(new_vtree) {
+                if (vtree === undefined) {
+                    vtree = new_vtree;
+                    element = virtual_dom_1.create(vtree);
+                    el[0].appendChild(element);
+                }
+                else {
+                    var patches = virtual_dom_1.diff(vtree, new_vtree);
+                    element = virtual_dom_1.patch(element, patches);
+                    vtree = new_vtree;
+                }
+            }
+            scope.$watch('xml', function (xml) {
+                if (xml) {
+                    var document = new DOMParser().parseFromString(xml, 'application/xml');
+                    var new_vtree = virtual_dom_1.h('div', renderXmlNodes(document.childNodes));
+                    update(new_vtree);
+                }
+            });
+        }
+    };
+});
 
-},{"./base64":1,"./formats/docx":3,"./util":83,"virtual-dom":52}]},{},[85]);
+},{"./formats/docx":2,"./util":83,"coders":9,"jszip":18,"virtual-dom":52}]},{},[85]);
