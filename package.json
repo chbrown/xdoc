@@ -41,8 +41,7 @@
     "misc-js": {
       "url": "git://github.com/chbrown/misc-js.git",
       "filter": [
-        "angular-plugins.js",
-        "textarea.js"
+        "angular-plugins.js"
       ]
     },
     "ng-storage": "*"
