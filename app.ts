@@ -2,7 +2,7 @@
 import {VNode, h, create, diff, patch} from 'virtual-dom';
 
 import docx = require('./formats/docx');
-import base64 = require('./base64');
+import {base64} from 'coders';
 import {log} from './util';
 import xdom = require('./xdom');
 
@@ -100,17 +100,20 @@ class LocalFile {
               public arraybuffer: ArrayBuffer = null) { }
 
   static fromJSON(obj: any): LocalFile {
-    var arraybuffer = base64.decodeArrayBuffer(obj.data);
+    var base64_string: string = obj.data;
+    var bytes = base64.decodeStringToBytes(base64_string);
+    var arraybuffer = new Uint8Array(bytes).buffer;
     return new LocalFile(obj.name, obj.size, obj.type, obj.lastModifiedDate, arraybuffer);
   }
-  toJSON = function() {
+  toJSON() {
+    var bytes = new Uint8Array(this.arraybuffer);
     return {
       __type__: 'LocalFile',
       name: this.name,
       size: this.size,
       type: this.type,
       lastModifiedDate: this.lastModifiedDate,
-      data: base64.encodeArrayBuffer(this.arraybuffer),
+      data: base64.encodeBytesToString(bytes),
     };
   }
 }
@@ -118,7 +121,7 @@ class LocalFile {
 // angular-ext.js hack
 Types['LocalFile'] = LocalFile;
 
-app.controller('wordCtrl', ($scope, $http, $flash, $localStorage) => {
+app.controller('wordCtrl', ($scope, $localStorage) => {
   $scope.$storage = $localStorage;
 
   var upload_el = document.querySelector('input[type="file"]');
@@ -135,19 +138,17 @@ app.controller('wordCtrl', ($scope, $http, $flash, $localStorage) => {
       // }
       $scope.$storage.file = new LocalFile(file.name, file.size, file.type, file.lastModifiedDate);
 
-      readFileAsArrayBuffer(file, function(err, arraybuffer) {
-        if (err) {
-          return $flash('Error reading file ' + file.name);
-        }
-
+      readFileAsArrayBuffer(file, (err, arraybuffer) => {
         $scope.$apply(function() {
+          if (err) throw err;
+          // return $flash('Error reading file ' + file.name);
           $scope.$storage.file.arraybuffer = arraybuffer;
         });
       });
     });
   });
 
-  $scope.$watch('$storage.file.arraybuffer', (new_arraybuffer: ArrayBuffer, old_arraybuffer: ArrayBuffer) => {
+  $scope.$watch('$storage.file.arraybuffer', (new_arraybuffer: ArrayBuffer) => {
     if (new_arraybuffer && new_arraybuffer.byteLength > 0) {
       $scope.document = docx.parseXDocument(new_arraybuffer);
       console.log('document', $scope.document);
@@ -163,12 +164,11 @@ app.directive('xdomDocument', () => {
       xdomDocument: '=',
     },
     link: (scope, el) => {
-      log('linking', scope);
       var element: Element;
       var vtree: VNode;
 
       function update(xDocument: xdom.XDocument) {
-        log('updating ', xDocument);
+        log('update() called in xdomDocument directive', xDocument);
         if (vtree === undefined) {
           vtree = xDocument.toVNode();
           element = create(vtree)
