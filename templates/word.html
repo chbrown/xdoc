@@ -17,3 +17,29 @@
     <li>ArrayBuffer.byteLength: {{$storage.file.arraybuffer.byteLength}}</li>
   </ul>
 </section>
+
+<section class="hpad">
+  <h3>Zip contents</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Dir</th>
+        <th>Date</th>
+        <th>Comment</th>
+        <th>Permissions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr ng-repeat="(name, object) in zip.files">
+        <td><a ui-sref="word.file({name: name})">{{object.name}}</a></td>
+        <td>{{object.dir}}</td>
+        <td>{{object.date}}</td>
+        <td>{{object.comment}}</td>
+        <td>{{object.unixPermissions || object.dosPermissions}}</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<ui-view></ui-view>

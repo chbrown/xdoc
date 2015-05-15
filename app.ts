@@ -1,6 +1,7 @@
 /// <reference path="type_declarations/index.d.ts" />
-import {VNode, h, create, diff, patch} from 'virtual-dom';
+import {VNode, VChild, h, create, diff, patch} from 'virtual-dom';
 
+import JSZip = require('jszip');
 import docx = require('./formats/docx');
 import {base64} from 'coders';
 import {log} from './util';
@@ -71,6 +72,11 @@ app.config(($stateProvider, $urlRouterProvider) => {
     url: '/word',
     templateUrl: 'templates/word.html',
     controller: 'wordCtrl',
+  })
+  .state('word.file', {
+    url: '/files/:name',
+    templateUrl: 'templates/word_file.html',
+    controller: 'wordFileCtrl',
   })
   .state('xdoc', {
     url: '/xdoc',
@@ -147,19 +153,32 @@ app.controller('wordCtrl', ($scope, $localStorage) => {
       });
     });
   };
+
+  $scope.$watch('$storage.file.arraybuffer', (arraybuffer: ArrayBuffer) => {
+    if (arraybuffer && arraybuffer.byteLength > 0) {
+      $scope.zip = new JSZip(arraybuffer);
+    }
+  });
+});
+
+app.controller('wordFileCtrl', ($scope, $state, $localStorage) => {
+  $scope.$storage = $localStorage;
+
+  var zip = new JSZip($scope.$storage.file.arraybuffer);
+  var file = $scope.file = zip.file($state.params.name);
+  var text = $scope.text = file.asText();
 });
 
 app.controller('xdocCtrl', ($scope, $localStorage) => {
   $scope.$storage = $localStorage;
 
-  $scope.$watch('$storage.file.arraybuffer', (new_arraybuffer: ArrayBuffer) => {
-    if (new_arraybuffer && new_arraybuffer.byteLength > 0) {
-      $scope.document = docx.parseXDocument(new_arraybuffer);
+  $scope.$watch('$storage.file.arraybuffer', (arraybuffer: ArrayBuffer) => {
+    if (arraybuffer && arraybuffer.byteLength > 0) {
+      $scope.document = docx.parseXDocument(arraybuffer);
       console.log('document', $scope.document);
     }
   });
 });
-
 
 app.directive('xdomDocument', () => {
   return {
@@ -192,6 +211,85 @@ app.directive('xdomDocument', () => {
           update(angular.copy(xDocument));
         }
       }, true);
+    }
+  };
+});
+
+function mapNodes<T>(nodes: NodeList, func: (node: Node) => T) {
+  var result: T[] = [];
+  for (var i = 0, node: Node; (node = nodes[i]); i++) {
+    result.push(func(node));
+  }
+  return result;
+}
+
+function mapAttributes<T>(attributes: NamedNodeMap, func: (attr: Attr) => T) {
+  var result: T[] = [];
+  for (var i = 0, attr: Attr; (attr = attributes[i]); i++) {
+    result.push(func(attr));
+  }
+  return result;
+}
+
+function renderAttributes(attributes: NamedNodeMap) {
+  return mapAttributes(attributes, attr => h('span.attribute', [h('span.name', attr.name), '=', h('span.value', attr.value)]));
+}
+
+function renderXmlNodes(nodes: NodeList) {
+  return mapNodes(nodes, (node: Node) => renderXmlNode(node));
+}
+
+function renderXmlNode(node: Node) {
+  if (node.nodeType == Node.TEXT_NODE) {
+    var text = <Text>node;
+    return h('div.text', text.data);
+  }
+  else if (node.nodeType == Node.ELEMENT_NODE) {
+    var element = <Element>node;
+    var tagName = element.tagName;
+    var startTagChildren: VChild[] = ['<', tagName];
+    startTagChildren = startTagChildren.concat(renderAttributes(element.attributes)).concat('>');
+    var startTag = h('span.start', startTagChildren);
+    var endTag = h('span.end', {}, ['</', tagName, '>']);
+    return h('div.element', [startTag, renderXmlNodes(node.childNodes), endTag]);
+  }
+  else {
+    return h('span', `(Ignoring node type = ${node.nodeType})`);
+  }
+}
+
+app.directive('xmlTree', () => {
+  return {
+    restrict: 'E',
+    scope: {
+      xml: '=',
+    },
+    link: (scope, el) => {
+      var element: Element;
+      var vtree: VNode;
+
+      function update(new_vtree: VNode) {
+        log('update() called in xmlTree directive');
+        if (vtree === undefined) {
+          vtree = new_vtree;
+          element = create(vtree)
+          el[0].appendChild(element);
+        }
+        else {
+          var patches = diff(vtree, new_vtree)
+          element = patch(element, patches)
+          vtree = new_vtree;
+        }
+      }
+
+      scope.$watch('xml', (xml: string) => {
+        log('wordFileCtrl $watch xml');
+        if (xml) {
+          var document = new DOMParser().parseFromString(xml, 'application/xml');
+          var new_vtree = h('div', renderXmlNodes(document.childNodes));
+          update(new_vtree);
+        }
+      });
     }
   };
 });

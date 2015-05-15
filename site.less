@@ -86,6 +86,7 @@ nav[fixedflow] {
   // "break-all: Word breaks may be inserted between any character
   //   for non-CJK (Chinese/Japanese/Korean) text."
   word-break: break-all;
+  white-space: pre-wrap;
 }
 .raw {
   // https://developer.mozilla.org/en-US/docs/Web/CSS/white-space
@@ -145,5 +146,34 @@ table.map {
     .endnote:before {
       content: 'Endnote';
     }
+  }
+}
+
+xml-tree {
+  font-size: 11px;
+  font-family: Consolas, Monaco, Menlo, monospace;
+  .element {
+    margin-left: 1em;
+  }
+  .attribute {
+    color: magenta;
+    &:before {
+      content: ' ';
+    }
+    .value {
+      &:before, &:after {
+        content: '"';
+      }
+    }
+  }
+  .start {
+    color: green;
+  }
+  .end {
+    color: red;
+  }
+  .text {
+    margin-left: 1em;
+    color: blue;
   }
 }
