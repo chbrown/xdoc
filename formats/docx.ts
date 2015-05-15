@@ -190,6 +190,11 @@ function readParagraph(paragraph_element: Element, context: Context, parser: Par
       // hopefully bookmarks aren't cross-nested
       var bookmark = context.bookmarkStack.pop();
       parser.bookmarks[bookmark.name] = bookmark;
+
+      // this is kind of a hack
+      if (paragraph instanceof xdom.XExample) {
+        paragraph.label = bookmark.name;
+      }
     }
     else {
       log('p > %s ignored', tag);

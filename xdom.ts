@@ -148,8 +148,11 @@ export class XParagraph extends XNode {
 }
 
 export class XExample extends XParagraph {
+  label: string;
   toVNode(): VNode {
-    return h('div.paragraph.example', this.getProperties(), this.getContent());
+    var properties = this.getProperties();
+    properties['title'] = `label=${this.label}`;
+    return h('div.paragraph.example', properties, this.getContent());
   }
 }
 
@@ -163,7 +166,9 @@ export class XReference extends XNode {
 
   toVNode(): VNode {
     // var bookmark = parser.bookmarks[complexField.code]
-    return h('span.reference', this.getProperties(), this.getContent());
+    var properties = this.getProperties();
+    properties['title'] = `code=${this.code}`;
+    return h('span.reference', properties, this.getContent());
   }
 }
 
