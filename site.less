@@ -113,6 +113,10 @@ table.map {
   font-family: "Times New Roman", Serif;
   background-color: #89A;
 
+  span {
+    outline: 1px solid lightpink;
+  }
+
   .paragraph {
     // empty paragraphs should still take up vertical space
     min-height: 1.2em;
@@ -152,21 +156,16 @@ table.map {
 .xml {
   font-size: 11px;
   font-family: Consolas, Monaco, Menlo, monospace;
-  .element {
-    margin-left: 1em;
+  .element, .text {
+    // 2ch is the width of two characters (only makes sense for monospace fonts)
+    margin-left: 2ch;
   }
   .attribute {
-    &:before {
-      content: ' ';
-    }
     .name {
       color: magenta;
     }
     .value {
       color: darkmagenta;
-      &:before, &:after {
-        content: '"';
-      }
     }
   }
   .start {
@@ -176,7 +175,6 @@ table.map {
     color: red;
   }
   .text {
-    margin-left: 1em;
     color: blue;
   }
 }

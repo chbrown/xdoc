@@ -148,7 +148,6 @@ app.controller('wordCtrl', ($scope, $localStorage) => {
     readFileAsArrayBuffer(file, (err, arraybuffer) => {
       $scope.$apply(function() {
         if (err) throw err;
-        // return $flash('Error reading file ' + file.name);
         $scope.$storage.file.arraybuffer = arraybuffer;
       });
     });
@@ -175,7 +174,6 @@ app.controller('xdocCtrl', ($scope, $localStorage) => {
   $scope.$watch('$storage.file.arraybuffer', (arraybuffer: ArrayBuffer) => {
     if (arraybuffer && arraybuffer.byteLength > 0) {
       $scope.document = docx.parseXDocument(arraybuffer);
-      console.log('document', $scope.document);
     }
   });
 });
@@ -191,7 +189,6 @@ app.directive('xdomDocument', () => {
       var vtree: VNode;
 
       function update(xDocument: xdom.XDocument) {
-        log('update() called in xdomDocument directive', xDocument);
         if (vtree === undefined) {
           vtree = xDocument.toVNode();
           element = create(vtree)
@@ -232,7 +229,8 @@ function mapAttributes<T>(attributes: NamedNodeMap, func: (attr: Attr) => T) {
 }
 
 function renderAttributes(attributes: NamedNodeMap) {
-  return mapAttributes(attributes, attr => h('span.attribute', [h('span.name', attr.name), '=', h('span.value', attr.value)]));
+  return mapAttributes(attributes, attr => h('span.attribute',
+    [' ', h('span.name', attr.name), '=', h('span.value', `"${attr.value}"`)]));
 }
 
 function renderXmlNodes(nodes: NodeList) {
@@ -269,7 +267,6 @@ app.directive('xmlTree', () => {
       var vtree: VNode;
 
       function update(new_vtree: VNode) {
-        log('update() called in xmlTree directive');
         if (vtree === undefined) {
           vtree = new_vtree;
           element = create(vtree)
@@ -283,7 +280,6 @@ app.directive('xmlTree', () => {
       }
 
       scope.$watch('xml', (xml: string) => {
-        log('wordFileCtrl $watch xml');
         if (xml) {
           var document = new DOMParser().parseFromString(xml, 'application/xml');
           var new_vtree = h('div', renderXmlNodes(document.childNodes));
