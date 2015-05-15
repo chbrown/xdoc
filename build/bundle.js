@@ -493,9 +493,9 @@ function dropNS(qualifiedName) {
 /**
 `properties` is an rPr or pPr element
 
-Returns a bitstring of xdom.Style flags
+Returns a number representing a bitstring of xdom.Style flags.
 */
-function readProperties(properties) {
+function readPropertiesStyles(properties) {
     var styles = 0;
     // everything we care about will an immediate child of the rPr or pPr
     eachChildElement(properties, function (child) {
@@ -510,6 +510,9 @@ function readProperties(properties) {
         else if (tag == 'b' && val != '0') {
             styles |= xdom.Style.Bold;
         }
+        else if (tag == 'u' && val == 'single') {
+            styles |= xdom.Style.Underline;
+        }
         else if (tag == 'vertAlign' && val == 'subscript') {
             styles |= xdom.Style.Subscript;
         }
@@ -521,8 +524,6 @@ function readProperties(properties) {
         }
         else if (tag == 'position' && val == '6') {
             styles |= xdom.Style.Superscript;
-        }
-        else if (tag == 'pStyle' && val == 'ListNumber') {
         }
         else {
         }
@@ -558,7 +559,17 @@ function readParagraph(paragraph_element, context, parser) {
     eachChildElement(paragraph_element, function (child) {
         var tag = dropNS(child.tagName);
         if (tag == 'pPr') {
-            context.stylesStack.top = readProperties(child);
+            context.stylesStack.top = readPropertiesStyles(child);
+            var pStyle = child.querySelector('pStyle');
+            if (pStyle) {
+                var pStyle_val = pStyle.getAttribute('w:val');
+                if (pStyle_val == 'ListNumber') {
+                    paragraph = new xdom.XExample(paragraph.childNodes, paragraph.textContent, paragraph.styles);
+                }
+                else {
+                    util_1.log('ignoring pPr > pStyle', pStyle_val);
+                }
+            }
         }
         else if (tag == 'r') {
             // readRun will most often return a list of only one node
@@ -604,6 +615,10 @@ function readParagraph(paragraph_element, context, parser) {
             // hopefully bookmarks aren't cross-nested
             var bookmark = context.bookmarkStack.pop();
             parser.bookmarks[bookmark.name] = bookmark;
+            // this is kind of a hack
+            if (paragraph instanceof xdom.XExample) {
+                paragraph.label = bookmark.name;
+            }
         }
         else {
             util_1.log('p > %s ignored', tag);
@@ -627,7 +642,7 @@ function readRun(run, context, parser) {
         var tag = dropNS(child.tagName);
         if (tag == 'rPr') {
             // presumably, the rPr will occur before anything else (it does in all the docx xml I've come across)
-            context.stylesStack.top = readProperties(child);
+            context.stylesStack.top = readPropertiesStyles(child);
         }
         else if (tag == 'footnoteReference') {
             var footnote_id = child.getAttribute('w:id');
@@ -689,7 +704,7 @@ function readRun(run, context, parser) {
             if (ref_match) {
                 var ref = ref_match[1];
                 var flags = ref_match[2];
-                util_1.log("Setting complex field code to \"" + ref + "\" (ignoring flags: " + flags + ")");
+                // log(`Setting complex field code to "${ref}" (ignoring flags: ${flags})`);
                 // `context.complexFieldStateStack.top` should not be undefined, and
                 // `context.complexFieldStateStack.top.separated` should be false
                 context.complexFieldStack.top.code = ref;
@@ -715,11 +730,9 @@ function readRun(run, context, parser) {
             else if (field_signal == 'end') {
                 // log('r > fldChar: fldCharType=end');
                 var complexField = context.complexFieldStack.pop();
-                var bookmark = parser.bookmarks[complexField.code];
-                // new_style: `REF=${complexField.code}`
-                var field_node = new xdom.XNode(complexField.childNodes, null, context.currentStyles());
-                util_1.log('resolving fldChar REF code: "%s"', complexField.code);
-                util_1.log('field_node', field_node, 'bookmark', bookmark);
+                var field_node = new xdom.XReference(complexField.code, complexField.childNodes, null, context.currentStyles());
+                // log('resolving fldChar REF code: "%s"', complexField.code);
+                // log('field_node', field_node, 'bookmark', bookmark);
                 nodes.push(field_node);
             }
             else {
@@ -914,7 +927,115 @@ var Parser = (function () {
 })();
 exports.Parser = Parser;
 
-},{"../characters":1,"../util":83,"../xdom":84,"adts":3,"jszip":18}],3:[function(require,module,exports){
+},{"../characters":1,"../util":84,"../xdom":85,"adts":4,"jszip":19}],3:[function(require,module,exports){
+// http://en.wikibooks.org/wiki/LaTeX/Special_Characters#Escaped_codes
+var util_1 = require('./util');
+exports.replacements = {
+    // these need to be first!
+    '\\': '\\backslash{}',
+    '{': '\\{',
+    '}': '\\}',
+    '$': '\\$',
+    '#': '\\#',
+    // acute
+    'á': "\\'a",
+    'é': "\\'e",
+    'í': "\\'i",
+    'ó': "\\'o",
+    'ú': "\\'u",
+    // double acute
+    'ő': '\\H{o}',
+    'ű': '\\H{u}',
+    // grave
+    'ò': '\\`{o}',
+    // umlaut
+    'ö': '\\"o',
+    'ü': '\\"u',
+    // circumflex
+    'ô': '\\^{o}',
+    // breve
+    'ŏ': '\\u{o}',
+    // caron / hacek (little v)
+    'č': '\\v{c}',
+    // combining accents
+    '̈': '\\"',
+    '́': "\\'",
+    'ø': '\\o',
+    'Ø': '\\O',
+    '∧': '$\\wedge$',
+    '∨': '$\\vee$',
+    '∀': '$\\forall$',
+    '': '$\\forall$',
+    '∃': '$\\exists$',
+    '': '$\\exists$',
+    '¬': '$\\neg$',
+    '≠': '$\\neq$',
+    '≤': '$\\leq$',
+    '': '$<$',
+    '<': '\\textless{}',
+    '>': '\\textgreater{}',
+    '∈': '$\\in$',
+    '': '$\\in$',
+    '∅': '$\\emptyset$',
+    '': '$\\cap$',
+    '−': '$-$',
+    '⊑': '$\\sqsubseteq$',
+    '⊃': '$\\supset$',
+    '⊂': '$\\subset$',
+    '≡': '$\\equiv$',
+    '≥': '$\\ge$',
+    '‘': '`',
+    '’': "'",
+    '“': '``',
+    '”': "''",
+    '…': '\\dots{}',
+    // greek alphabet
+    'α': '$\\alpha$',
+    '': '$\\alpha$',
+    'λ': '$\\lambda$',
+    '': '$\\lambda$',
+    'δ': '$\\delta$',
+    'ε': '$\\epsilon$',
+    'ι': '$\\iota$',
+    'Π': '$\\Pi$',
+    'π': '$\\pi$',
+    'ϕ': '$\\phi$',
+    '': '$\\phi$',
+    'θ': '$\\theta$',
+    'Θ': '$\\Theta$',
+    'β': '$\\beta$',
+    '': '$\\beta$',
+    '': ' ',
+    '': '$\\pi$',
+    '': ',',
+    'µ': '$\\mu$',
+    'μ': '$\\mu$',
+    'τ': '$\\tau$',
+    '◊': '$\\lozenge$',
+    '\t': '\\hspace{4em}',
+    '⇐': '$\\Leftarrow$',
+    '⇔': '$\\Leftrightarrow$',
+    '⇒': '$\\Rightarrow$',
+    '→': '$\\to$',
+    '&': '\\&',
+    '—': '---',
+    '–': '--',
+    '∞': '$\\infty$',
+    '☐': '$\\square$',
+    '\xa0': '\\ ',
+    // ligatures
+    'ﬁ': 'fi',
+    '': '\\{',
+    '': '|',
+    '': '$>$',
+    '%': '\\%',
+    // ascii symbols (not really a LaTeX issue)
+    '==>': '$\\Rightarrow$',
+    '||': '\\textbardbl{}',
+};
+exports.replacementRegExp = new RegExp(Object.keys(exports.replacements).map(util_1.escapeRegExp).join('|'), 'g');
+
+},{"./util":84}],4:[function(require,module,exports){
 /**
 Bag: a multiset; i.e., a Set with counts. The underlying datatype
 is a object, `._element_object`. The effective default of members
@@ -1252,9 +1373,9 @@ var Stack = (function () {
 })();
 exports.Stack = Stack;
 
-},{}],4:[function(require,module,exports){
-
 },{}],5:[function(require,module,exports){
+
+},{}],6:[function(require,module,exports){
 /*!
  * The buffer module from node.js, for the browser.
  *
@@ -2670,7 +2791,7 @@ function decodeUtf8Char (str) {
   }
 }
 
-},{"base64-js":6,"ieee754":7,"is-array":8}],6:[function(require,module,exports){
+},{"base64-js":7,"ieee754":8,"is-array":9}],7:[function(require,module,exports){
 var lookup = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
 ;(function (exports) {
@@ -2796,7 +2917,7 @@ var lookup = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 	exports.fromByteArray = uint8ToBase64
 }(typeof exports === 'undefined' ? (this.base64js = {}) : exports))
 
-},{}],7:[function(require,module,exports){
+},{}],8:[function(require,module,exports){
 exports.read = function (buffer, offset, isLE, mLen, nBytes) {
   var e, m,
       eLen = nBytes * 8 - mLen - 1,
@@ -2882,7 +3003,7 @@ exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
   buffer[offset + i - d] |= s * 128
 }
 
-},{}],8:[function(require,module,exports){
+},{}],9:[function(require,module,exports){
 
 /**
  * isArray
@@ -2917,7 +3038,7 @@ module.exports = isArray || function (val) {
   return !! val && '[object Array]' == str.call(val);
 };
 
-},{}],9:[function(require,module,exports){
+},{}],10:[function(require,module,exports){
 var coders;
 (function (coders) {
     var base64;
@@ -3077,7 +3198,7 @@ var coders;
 })(coders || (coders = {}));
 module.exports = coders;
 
-},{}],10:[function(require,module,exports){
+},{}],11:[function(require,module,exports){
 'use strict';
 // private property
 var _keyStr = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
@@ -3149,7 +3270,7 @@ exports.decode = function(input, utf8) {
 
 };
 
-},{}],11:[function(require,module,exports){
+},{}],12:[function(require,module,exports){
 'use strict';
 function CompressedObject() {
     this.compressedSize = 0;
@@ -3179,7 +3300,7 @@ CompressedObject.prototype = {
 };
 module.exports = CompressedObject;
 
-},{}],12:[function(require,module,exports){
+},{}],13:[function(require,module,exports){
 'use strict';
 exports.STORE = {
     magic: "\x00\x00",
@@ -3194,7 +3315,7 @@ exports.STORE = {
 };
 exports.DEFLATE = require('./flate');
 
-},{"./flate":17}],13:[function(require,module,exports){
+},{"./flate":18}],14:[function(require,module,exports){
 'use strict';
 
 var utils = require('./utils');
@@ -3298,7 +3419,7 @@ module.exports = function crc32(input, crc) {
 };
 // vim: set shiftwidth=4 softtabstop=4:
 
-},{"./utils":30}],14:[function(require,module,exports){
+},{"./utils":31}],15:[function(require,module,exports){
 'use strict';
 var utils = require('./utils');
 
@@ -3407,7 +3528,7 @@ DataReader.prototype = {
 };
 module.exports = DataReader;
 
-},{"./utils":30}],15:[function(require,module,exports){
+},{"./utils":31}],16:[function(require,module,exports){
 'use strict';
 exports.base64 = false;
 exports.binary = false;
@@ -3420,7 +3541,7 @@ exports.comment = null;
 exports.unixPermissions = null;
 exports.dosPermissions = null;
 
-},{}],16:[function(require,module,exports){
+},{}],17:[function(require,module,exports){
 'use strict';
 var utils = require('./utils');
 
@@ -3527,7 +3648,7 @@ exports.isRegExp = function (object) {
 };
 
 
-},{"./utils":30}],17:[function(require,module,exports){
+},{"./utils":31}],18:[function(require,module,exports){
 'use strict';
 var USE_TYPEDARRAY = (typeof Uint8Array !== 'undefined') && (typeof Uint16Array !== 'undefined') && (typeof Uint32Array !== 'undefined');
 
@@ -3545,7 +3666,7 @@ exports.uncompress =  function(input) {
     return pako.inflateRaw(input);
 };
 
-},{"pako":33}],18:[function(require,module,exports){
+},{"pako":34}],19:[function(require,module,exports){
 'use strict';
 
 var base64 = require('./base64');
@@ -3626,7 +3747,7 @@ JSZip.base64 = {
 JSZip.compressions = require('./compressions');
 module.exports = JSZip;
 
-},{"./base64":10,"./compressions":12,"./defaults":15,"./deprecatedPublicUtils":16,"./load":19,"./object":22,"./support":26}],19:[function(require,module,exports){
+},{"./base64":11,"./compressions":13,"./defaults":16,"./deprecatedPublicUtils":17,"./load":20,"./object":23,"./support":27}],20:[function(require,module,exports){
 'use strict';
 var base64 = require('./base64');
 var ZipEntries = require('./zipEntries');
@@ -3659,7 +3780,7 @@ module.exports = function(data, options) {
     return this;
 };
 
-},{"./base64":10,"./zipEntries":31}],20:[function(require,module,exports){
+},{"./base64":11,"./zipEntries":32}],21:[function(require,module,exports){
 (function (Buffer){
 'use strict';
 module.exports = function(data, encoding){
@@ -3670,7 +3791,7 @@ module.exports.test = function(b){
 };
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":5}],21:[function(require,module,exports){
+},{"buffer":6}],22:[function(require,module,exports){
 'use strict';
 var Uint8ArrayReader = require('./uint8ArrayReader');
 
@@ -3692,7 +3813,7 @@ NodeBufferReader.prototype.readData = function(size) {
 };
 module.exports = NodeBufferReader;
 
-},{"./uint8ArrayReader":27}],22:[function(require,module,exports){
+},{"./uint8ArrayReader":28}],23:[function(require,module,exports){
 'use strict';
 var support = require('./support');
 var utils = require('./utils');
@@ -4577,7 +4698,7 @@ var out = {
 };
 module.exports = out;
 
-},{"./base64":10,"./compressedObject":11,"./compressions":12,"./crc32":13,"./defaults":15,"./nodeBuffer":20,"./signature":23,"./stringWriter":25,"./support":26,"./uint8ArrayWriter":28,"./utf8":29,"./utils":30}],23:[function(require,module,exports){
+},{"./base64":11,"./compressedObject":12,"./compressions":13,"./crc32":14,"./defaults":16,"./nodeBuffer":21,"./signature":24,"./stringWriter":26,"./support":27,"./uint8ArrayWriter":29,"./utf8":30,"./utils":31}],24:[function(require,module,exports){
 'use strict';
 exports.LOCAL_FILE_HEADER = "PK\x03\x04";
 exports.CENTRAL_FILE_HEADER = "PK\x01\x02";
@@ -4586,7 +4707,7 @@ exports.ZIP64_CENTRAL_DIRECTORY_LOCATOR = "PK\x06\x07";
 exports.ZIP64_CENTRAL_DIRECTORY_END = "PK\x06\x06";
 exports.DATA_DESCRIPTOR = "PK\x07\x08";
 
-},{}],24:[function(require,module,exports){
+},{}],25:[function(require,module,exports){
 'use strict';
 var DataReader = require('./dataReader');
 var utils = require('./utils');
@@ -4624,7 +4745,7 @@ StringReader.prototype.readData = function(size) {
 };
 module.exports = StringReader;
 
-},{"./dataReader":14,"./utils":30}],25:[function(require,module,exports){
+},{"./dataReader":15,"./utils":31}],26:[function(require,module,exports){
 'use strict';
 
 var utils = require('./utils');
@@ -4656,7 +4777,7 @@ StringWriter.prototype = {
 
 module.exports = StringWriter;
 
-},{"./utils":30}],26:[function(require,module,exports){
+},{"./utils":31}],27:[function(require,module,exports){
 (function (Buffer){
 'use strict';
 exports.base64 = true;
@@ -4694,7 +4815,7 @@ else {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":5}],27:[function(require,module,exports){
+},{"buffer":6}],28:[function(require,module,exports){
 'use strict';
 var DataReader = require('./dataReader');
 
@@ -4743,7 +4864,7 @@ Uint8ArrayReader.prototype.readData = function(size) {
 };
 module.exports = Uint8ArrayReader;
 
-},{"./dataReader":14}],28:[function(require,module,exports){
+},{"./dataReader":15}],29:[function(require,module,exports){
 'use strict';
 
 var utils = require('./utils');
@@ -4781,7 +4902,7 @@ Uint8ArrayWriter.prototype = {
 
 module.exports = Uint8ArrayWriter;
 
-},{"./utils":30}],29:[function(require,module,exports){
+},{"./utils":31}],30:[function(require,module,exports){
 'use strict';
 
 var utils = require('./utils');
@@ -4990,7 +5111,7 @@ exports.utf8decode = function utf8decode(buf) {
 };
 // vim: set shiftwidth=4 softtabstop=4:
 
-},{"./nodeBuffer":20,"./support":26,"./utils":30}],30:[function(require,module,exports){
+},{"./nodeBuffer":21,"./support":27,"./utils":31}],31:[function(require,module,exports){
 'use strict';
 var support = require('./support');
 var compressions = require('./compressions');
@@ -5318,7 +5439,7 @@ exports.isRegExp = function (object) {
 };
 
 
-},{"./compressions":12,"./nodeBuffer":20,"./support":26}],31:[function(require,module,exports){
+},{"./compressions":13,"./nodeBuffer":21,"./support":27}],32:[function(require,module,exports){
 'use strict';
 var StringReader = require('./stringReader');
 var NodeBufferReader = require('./nodeBufferReader');
@@ -5541,7 +5662,7 @@ ZipEntries.prototype = {
 // }}} end of ZipEntries
 module.exports = ZipEntries;
 
-},{"./nodeBufferReader":21,"./object":22,"./signature":23,"./stringReader":24,"./support":26,"./uint8ArrayReader":27,"./utils":30,"./zipEntry":32}],32:[function(require,module,exports){
+},{"./nodeBufferReader":22,"./object":23,"./signature":24,"./stringReader":25,"./support":27,"./uint8ArrayReader":28,"./utils":31,"./zipEntry":33}],33:[function(require,module,exports){
 'use strict';
 var StringReader = require('./stringReader');
 var utils = require('./utils');
@@ -5853,7 +5974,7 @@ ZipEntry.prototype = {
 };
 module.exports = ZipEntry;
 
-},{"./compressedObject":11,"./object":22,"./stringReader":24,"./utils":30}],33:[function(require,module,exports){
+},{"./compressedObject":12,"./object":23,"./stringReader":25,"./utils":31}],34:[function(require,module,exports){
 // Top level file is just a mixin of submodules & constants
 'use strict';
 
@@ -5868,7 +5989,7 @@ var pako = {};
 assign(pako, deflate, inflate, constants);
 
 module.exports = pako;
-},{"./lib/deflate":34,"./lib/inflate":35,"./lib/utils/common":36,"./lib/zlib/constants":39}],34:[function(require,module,exports){
+},{"./lib/deflate":35,"./lib/inflate":36,"./lib/utils/common":37,"./lib/zlib/constants":40}],35:[function(require,module,exports){
 'use strict';
 
 
@@ -6233,7 +6354,7 @@ exports.Deflate = Deflate;
 exports.deflate = deflate;
 exports.deflateRaw = deflateRaw;
 exports.gzip = gzip;
-},{"./utils/common":36,"./utils/strings":37,"./zlib/deflate.js":41,"./zlib/messages":46,"./zlib/zstream":48}],35:[function(require,module,exports){
+},{"./utils/common":37,"./utils/strings":38,"./zlib/deflate.js":42,"./zlib/messages":47,"./zlib/zstream":49}],36:[function(require,module,exports){
 'use strict';
 
 
@@ -6602,7 +6723,7 @@ exports.inflate = inflate;
 exports.inflateRaw = inflateRaw;
 exports.ungzip  = inflate;
 
-},{"./utils/common":36,"./utils/strings":37,"./zlib/constants":39,"./zlib/gzheader":42,"./zlib/inflate.js":44,"./zlib/messages":46,"./zlib/zstream":48}],36:[function(require,module,exports){
+},{"./utils/common":37,"./utils/strings":38,"./zlib/constants":40,"./zlib/gzheader":43,"./zlib/inflate.js":45,"./zlib/messages":47,"./zlib/zstream":49}],37:[function(require,module,exports){
 'use strict';
 
 
@@ -6705,7 +6826,7 @@ exports.setTyped = function (on) {
 };
 
 exports.setTyped(TYPED_OK);
-},{}],37:[function(require,module,exports){
+},{}],38:[function(require,module,exports){
 // String encode/decode helpers
 'use strict';
 
@@ -6892,7 +7013,7 @@ exports.utf8border = function(buf, max) {
   return (pos + _utf8len[buf[pos]] > max) ? pos : max;
 };
 
-},{"./common":36}],38:[function(require,module,exports){
+},{"./common":37}],39:[function(require,module,exports){
 'use strict';
 
 // Note: adler32 takes 12% for level 0 and 2% for level 6.
@@ -6925,7 +7046,7 @@ function adler32(adler, buf, len, pos) {
 
 
 module.exports = adler32;
-},{}],39:[function(require,module,exports){
+},{}],40:[function(require,module,exports){
 module.exports = {
 
   /* Allowed flush values; see deflate() and inflate() below for details */
@@ -6973,7 +7094,7 @@ module.exports = {
   Z_DEFLATED:               8
   //Z_NULL:                 null // Use -1 or null inline, depending on var type
 };
-},{}],40:[function(require,module,exports){
+},{}],41:[function(require,module,exports){
 'use strict';
 
 // Note: we can't get significant speed boost here.
@@ -7015,7 +7136,7 @@ function crc32(crc, buf, len, pos) {
 
 
 module.exports = crc32;
-},{}],41:[function(require,module,exports){
+},{}],42:[function(require,module,exports){
 'use strict';
 
 var utils   = require('../utils/common');
@@ -8781,7 +8902,7 @@ exports.deflatePending = deflatePending;
 exports.deflatePrime = deflatePrime;
 exports.deflateTune = deflateTune;
 */
-},{"../utils/common":36,"./adler32":38,"./crc32":40,"./messages":46,"./trees":47}],42:[function(require,module,exports){
+},{"../utils/common":37,"./adler32":39,"./crc32":41,"./messages":47,"./trees":48}],43:[function(require,module,exports){
 'use strict';
 
 
@@ -8822,7 +8943,7 @@ function GZheader() {
 }
 
 module.exports = GZheader;
-},{}],43:[function(require,module,exports){
+},{}],44:[function(require,module,exports){
 'use strict';
 
 // See state defs from inflate.js
@@ -9149,7 +9270,7 @@ module.exports = function inflate_fast(strm, start) {
   return;
 };
 
-},{}],44:[function(require,module,exports){
+},{}],45:[function(require,module,exports){
 'use strict';
 
 
@@ -10653,7 +10774,7 @@ exports.inflateSync = inflateSync;
 exports.inflateSyncPoint = inflateSyncPoint;
 exports.inflateUndermine = inflateUndermine;
 */
-},{"../utils/common":36,"./adler32":38,"./crc32":40,"./inffast":43,"./inftrees":45}],45:[function(require,module,exports){
+},{"../utils/common":37,"./adler32":39,"./crc32":41,"./inffast":44,"./inftrees":46}],46:[function(require,module,exports){
 'use strict';
 
 
@@ -10980,7 +11101,7 @@ module.exports = function inflate_table(type, lens, lens_index, codes, table, ta
   return 0;
 };
 
-},{"../utils/common":36}],46:[function(require,module,exports){
+},{"../utils/common":37}],47:[function(require,module,exports){
 'use strict';
 
 module.exports = {
@@ -10994,7 +11115,7 @@ module.exports = {
   '-5':   'buffer error',        /* Z_BUF_ERROR     (-5) */
   '-6':   'incompatible version' /* Z_VERSION_ERROR (-6) */
 };
-},{}],47:[function(require,module,exports){
+},{}],48:[function(require,module,exports){
 'use strict';
 
 
@@ -12194,7 +12315,7 @@ exports._tr_stored_block = _tr_stored_block;
 exports._tr_flush_block  = _tr_flush_block;
 exports._tr_tally = _tr_tally;
 exports._tr_align = _tr_align;
-},{"../utils/common":36}],48:[function(require,module,exports){
+},{"../utils/common":37}],49:[function(require,module,exports){
 'use strict';
 
 
@@ -12224,22 +12345,22 @@ function ZStream() {
 }
 
 module.exports = ZStream;
-},{}],49:[function(require,module,exports){
+},{}],50:[function(require,module,exports){
 var createElement = require("./vdom/create-element.js")
 
 module.exports = createElement
 
-},{"./vdom/create-element.js":62}],50:[function(require,module,exports){
+},{"./vdom/create-element.js":63}],51:[function(require,module,exports){
 var diff = require("./vtree/diff.js")
 
 module.exports = diff
 
-},{"./vtree/diff.js":82}],51:[function(require,module,exports){
+},{"./vtree/diff.js":83}],52:[function(require,module,exports){
 var h = require("./virtual-hyperscript/index.js")
 
 module.exports = h
 
-},{"./virtual-hyperscript/index.js":69}],52:[function(require,module,exports){
+},{"./virtual-hyperscript/index.js":70}],53:[function(require,module,exports){
 var diff = require("./diff.js")
 var patch = require("./patch.js")
 var h = require("./h.js")
@@ -12256,7 +12377,7 @@ module.exports = {
     VText: VText
 }
 
-},{"./create-element.js":49,"./diff.js":50,"./h.js":51,"./patch.js":60,"./vnode/vnode.js":78,"./vnode/vtext.js":80}],53:[function(require,module,exports){
+},{"./create-element.js":50,"./diff.js":51,"./h.js":52,"./patch.js":61,"./vnode/vnode.js":79,"./vnode/vtext.js":81}],54:[function(require,module,exports){
 /*!
  * Cross-Browser Split 1.1.1
  * Copyright 2007-2012 Steven Levithan <stevenlevithan.com>
@@ -12364,7 +12485,7 @@ module.exports = (function split(undef) {
   return self;
 })();
 
-},{}],54:[function(require,module,exports){
+},{}],55:[function(require,module,exports){
 'use strict';
 
 var OneVersionConstraint = require('individual/one-version');
@@ -12386,7 +12507,7 @@ function EvStore(elem) {
     return hash;
 }
 
-},{"individual/one-version":56}],55:[function(require,module,exports){
+},{"individual/one-version":57}],56:[function(require,module,exports){
 (function (global){
 'use strict';
 
@@ -12409,7 +12530,7 @@ function Individual(key, value) {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],56:[function(require,module,exports){
+},{}],57:[function(require,module,exports){
 'use strict';
 
 var Individual = require('./index.js');
@@ -12433,7 +12554,7 @@ function OneVersion(moduleName, version, defaultValue) {
     return Individual(key, defaultValue);
 }
 
-},{"./index.js":55}],57:[function(require,module,exports){
+},{"./index.js":56}],58:[function(require,module,exports){
 (function (global){
 var topLevel = typeof global !== 'undefined' ? global :
     typeof window !== 'undefined' ? window : {}
@@ -12452,14 +12573,14 @@ if (typeof document !== 'undefined') {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"min-document":4}],58:[function(require,module,exports){
+},{"min-document":5}],59:[function(require,module,exports){
 "use strict";
 
 module.exports = function isObject(x) {
 	return typeof x === "object" && x !== null;
 };
 
-},{}],59:[function(require,module,exports){
+},{}],60:[function(require,module,exports){
 var nativeIsArray = Array.isArray
 var toString = Object.prototype.toString
 
@@ -12469,12 +12590,12 @@ function isArray(obj) {
     return toString.call(obj) === "[object Array]"
 }
 
-},{}],60:[function(require,module,exports){
+},{}],61:[function(require,module,exports){
 var patch = require("./vdom/patch.js")
 
 module.exports = patch
 
-},{"./vdom/patch.js":65}],61:[function(require,module,exports){
+},{"./vdom/patch.js":66}],62:[function(require,module,exports){
 var isObject = require("is-object")
 var isHook = require("../vnode/is-vhook.js")
 
@@ -12573,7 +12694,7 @@ function getPrototype(value) {
     }
 }
 
-},{"../vnode/is-vhook.js":73,"is-object":58}],62:[function(require,module,exports){
+},{"../vnode/is-vhook.js":74,"is-object":59}],63:[function(require,module,exports){
 var document = require("global/document")
 
 var applyProperties = require("./apply-properties")
@@ -12621,7 +12742,7 @@ function createElement(vnode, opts) {
     return node
 }
 
-},{"../vnode/handle-thunk.js":71,"../vnode/is-vnode.js":74,"../vnode/is-vtext.js":75,"../vnode/is-widget.js":76,"./apply-properties":61,"global/document":57}],63:[function(require,module,exports){
+},{"../vnode/handle-thunk.js":72,"../vnode/is-vnode.js":75,"../vnode/is-vtext.js":76,"../vnode/is-widget.js":77,"./apply-properties":62,"global/document":58}],64:[function(require,module,exports){
 // Maps a virtual DOM tree onto a real DOM tree in an efficient manner.
 // We don't want to read all of the DOM nodes in the tree so we use
 // the in-order tree indexing to eliminate recursion down certain branches.
@@ -12708,7 +12829,7 @@ function ascending(a, b) {
     return a > b ? 1 : -1
 }
 
-},{}],64:[function(require,module,exports){
+},{}],65:[function(require,module,exports){
 var applyProperties = require("./apply-properties")
 
 var isWidget = require("../vnode/is-widget.js")
@@ -12862,7 +12983,7 @@ function replaceRoot(oldRoot, newRoot) {
     return newRoot;
 }
 
-},{"../vnode/is-widget.js":76,"../vnode/vpatch.js":79,"./apply-properties":61,"./create-element":62,"./update-widget":66}],65:[function(require,module,exports){
+},{"../vnode/is-widget.js":77,"../vnode/vpatch.js":80,"./apply-properties":62,"./create-element":63,"./update-widget":67}],66:[function(require,module,exports){
 var document = require("global/document")
 var isArray = require("x-is-array")
 
@@ -12940,7 +13061,7 @@ function patchIndices(patches) {
     return indices
 }
 
-},{"./dom-index":63,"./patch-op":64,"global/document":57,"x-is-array":59}],66:[function(require,module,exports){
+},{"./dom-index":64,"./patch-op":65,"global/document":58,"x-is-array":60}],67:[function(require,module,exports){
 var isWidget = require("../vnode/is-widget.js")
 
 module.exports = updateWidget
@@ -12957,7 +13078,7 @@ function updateWidget(a, b) {
     return false
 }
 
-},{"../vnode/is-widget.js":76}],67:[function(require,module,exports){
+},{"../vnode/is-widget.js":77}],68:[function(require,module,exports){
 'use strict';
 
 var EvStore = require('ev-store');
@@ -12986,7 +13107,7 @@ EvHook.prototype.unhook = function(node, propertyName) {
     es[propName] = undefined;
 };
 
-},{"ev-store":54}],68:[function(require,module,exports){
+},{"ev-store":55}],69:[function(require,module,exports){
 'use strict';
 
 module.exports = SoftSetHook;
@@ -13005,7 +13126,7 @@ SoftSetHook.prototype.hook = function (node, propertyName) {
     }
 };
 
-},{}],69:[function(require,module,exports){
+},{}],70:[function(require,module,exports){
 'use strict';
 
 var isArray = require('x-is-array');
@@ -13142,7 +13263,7 @@ function errorString(obj) {
     }
 }
 
-},{"../vnode/is-thunk":72,"../vnode/is-vhook":73,"../vnode/is-vnode":74,"../vnode/is-vtext":75,"../vnode/is-widget":76,"../vnode/vnode.js":78,"../vnode/vtext.js":80,"./hooks/ev-hook.js":67,"./hooks/soft-set-hook.js":68,"./parse-tag.js":70,"x-is-array":59}],70:[function(require,module,exports){
+},{"../vnode/is-thunk":73,"../vnode/is-vhook":74,"../vnode/is-vnode":75,"../vnode/is-vtext":76,"../vnode/is-widget":77,"../vnode/vnode.js":79,"../vnode/vtext.js":81,"./hooks/ev-hook.js":68,"./hooks/soft-set-hook.js":69,"./parse-tag.js":71,"x-is-array":60}],71:[function(require,module,exports){
 'use strict';
 
 var split = require('browser-split');
@@ -13198,7 +13319,7 @@ function parseTag(tag, props) {
     return props.namespace ? tagName : tagName.toUpperCase();
 }
 
-},{"browser-split":53}],71:[function(require,module,exports){
+},{"browser-split":54}],72:[function(require,module,exports){
 var isVNode = require("./is-vnode")
 var isVText = require("./is-vtext")
 var isWidget = require("./is-widget")
@@ -13240,14 +13361,14 @@ function renderThunk(thunk, previous) {
     return renderedThunk
 }
 
-},{"./is-thunk":72,"./is-vnode":74,"./is-vtext":75,"./is-widget":76}],72:[function(require,module,exports){
+},{"./is-thunk":73,"./is-vnode":75,"./is-vtext":76,"./is-widget":77}],73:[function(require,module,exports){
 module.exports = isThunk
 
 function isThunk(t) {
     return t && t.type === "Thunk"
 }
 
-},{}],73:[function(require,module,exports){
+},{}],74:[function(require,module,exports){
 module.exports = isHook
 
 function isHook(hook) {
@@ -13256,7 +13377,7 @@ function isHook(hook) {
        typeof hook.unhook === "function" && !hook.hasOwnProperty("unhook"))
 }
 
-},{}],74:[function(require,module,exports){
+},{}],75:[function(require,module,exports){
 var version = require("./version")
 
 module.exports = isVirtualNode
@@ -13265,7 +13386,7 @@ function isVirtualNode(x) {
     return x && x.type === "VirtualNode" && x.version === version
 }
 
-},{"./version":77}],75:[function(require,module,exports){
+},{"./version":78}],76:[function(require,module,exports){
 var version = require("./version")
 
 module.exports = isVirtualText
@@ -13274,17 +13395,17 @@ function isVirtualText(x) {
     return x && x.type === "VirtualText" && x.version === version
 }
 
-},{"./version":77}],76:[function(require,module,exports){
+},{"./version":78}],77:[function(require,module,exports){
 module.exports = isWidget
 
 function isWidget(w) {
     return w && w.type === "Widget"
 }
 
-},{}],77:[function(require,module,exports){
+},{}],78:[function(require,module,exports){
 module.exports = "2"
 
-},{}],78:[function(require,module,exports){
+},{}],79:[function(require,module,exports){
 var version = require("./version")
 var isVNode = require("./is-vnode")
 var isWidget = require("./is-widget")
@@ -13358,7 +13479,7 @@ function VirtualNode(tagName, properties, children, key, namespace) {
 VirtualNode.prototype.version = version
 VirtualNode.prototype.type = "VirtualNode"
 
-},{"./is-thunk":72,"./is-vhook":73,"./is-vnode":74,"./is-widget":76,"./version":77}],79:[function(require,module,exports){
+},{"./is-thunk":73,"./is-vhook":74,"./is-vnode":75,"./is-widget":77,"./version":78}],80:[function(require,module,exports){
 var version = require("./version")
 
 VirtualPatch.NONE = 0
@@ -13382,7 +13503,7 @@ function VirtualPatch(type, vNode, patch) {
 VirtualPatch.prototype.version = version
 VirtualPatch.prototype.type = "VirtualPatch"
 
-},{"./version":77}],80:[function(require,module,exports){
+},{"./version":78}],81:[function(require,module,exports){
 var version = require("./version")
 
 module.exports = VirtualText
@@ -13394,7 +13515,7 @@ function VirtualText(text) {
 VirtualText.prototype.version = version
 VirtualText.prototype.type = "VirtualText"
 
-},{"./version":77}],81:[function(require,module,exports){
+},{"./version":78}],82:[function(require,module,exports){
 var isObject = require("is-object")
 var isHook = require("../vnode/is-vhook")
 
@@ -13454,7 +13575,7 @@ function getPrototype(value) {
   }
 }
 
-},{"../vnode/is-vhook":73,"is-object":58}],82:[function(require,module,exports){
+},{"../vnode/is-vhook":74,"is-object":59}],83:[function(require,module,exports){
 var isArray = require("x-is-array")
 
 var VPatch = require("../vnode/vpatch")
@@ -13883,8 +14004,28 @@ function appendPatch(apply, patch) {
     }
 }
 
-},{"../vnode/handle-thunk":71,"../vnode/is-thunk":72,"../vnode/is-vnode":74,"../vnode/is-vtext":75,"../vnode/is-widget":76,"../vnode/vpatch":79,"./diff-props":81,"x-is-array":59}],83:[function(require,module,exports){
+},{"../vnode/handle-thunk":72,"../vnode/is-thunk":73,"../vnode/is-vnode":75,"../vnode/is-vtext":76,"../vnode/is-widget":77,"../vnode/vpatch":80,"./diff-props":82,"x-is-array":60}],84:[function(require,module,exports){
 exports.log = console.log.bind(console);
+/** from MDN */
+function escapeRegExp(raw) {
+    return raw.replace(/([.*+?^=!:${}()|[\]\/\\])/g, '\\$1');
+}
+exports.escapeRegExp = escapeRegExp;
+;
+// pushAll, flatten, and flatMap come from pdfi/Arrays
+function pushAll(array, items) {
+    return Array.prototype.push.apply(array, items);
+}
+exports.pushAll = pushAll;
+function flatten(arrays) {
+    return Array.prototype.concat.apply([], arrays);
+}
+exports.flatten = flatten;
+function flatMap(elements, callback, thisArg) {
+    var arrays = elements.map(callback, thisArg);
+    return flatten(arrays);
+}
+exports.flatMap = flatMap;
 /**
 Search the codebase for @util.memoize or @memoize for usage examples.
 */
@@ -13902,7 +14043,7 @@ function memoize(target, propertyKey, descriptor) {
 }
 exports.memoize = memoize;
 
-},{}],84:[function(require,module,exports){
+},{}],85:[function(require,module,exports){
 var __extends = this.__extends || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
@@ -13910,6 +14051,7 @@ var __extends = this.__extends || function (d, b) {
     d.prototype = new __();
 };
 var virtual_dom_1 = require('virtual-dom');
+var latex_1 = require('./latex');
 // We can do bitwise math in Javascript up to 2^29, so we can have up to
 // 29 styles
 // 2 << 29 ==  1073741824 == 2^30
@@ -13922,6 +14064,13 @@ var virtual_dom_1 = require('virtual-dom');
     Style[Style["Superscript"] = 16] = "Superscript";
 })(exports.Style || (exports.Style = {}));
 var Style = exports.Style;
+function t(command, content) {
+    return "\\" + command + "{" + content + "}";
+}
+function stringToLaTeX(raw) {
+    // log('Escaping: "%s"', string.encode('utf8'))
+    return raw.replace(latex_1.replacementRegExp, function (match) { return latex_1.replacements[match]; });
+}
 /**
 A fragment of a Document model; can be either a container,
 or, when extended, a node with some semantic role in a document.
@@ -13935,6 +14084,12 @@ var XNode = (function () {
         this.textContent = textContent;
         this.styles = styles;
     }
+    XNode.prototype.appendChild = function (newChild) {
+        this.childNodes.push(newChild);
+    };
+    XNode.prototype.appendChildren = function (newChildren) {
+        Array.prototype.push.apply(this.childNodes, newChildren);
+    };
     XNode.prototype.getProperties = function () {
         // could be CSSStyleDeclaration but all the properties are required
         var style = {};
@@ -13966,11 +14121,25 @@ var XNode = (function () {
     XNode.prototype.toVNode = function () {
         return virtual_dom_1.h('span', this.getProperties(), this.getContent());
     };
-    XNode.prototype.appendChild = function (newChild) {
-        this.childNodes.push(newChild);
-    };
-    XNode.prototype.appendChildren = function (newChildren) {
-        Array.prototype.push.apply(this.childNodes, newChildren);
+    XNode.prototype.toLaTeX = function () {
+        var content = this.textContent ? stringToLaTeX(this.textContent) : this.childNodes.map(function (childNode) { return childNode.toLaTeX(); }).join('');
+        if (this.styles & Style.Italic) {
+            content = t('textit', content);
+        }
+        if (this.styles & Style.Bold) {
+            content = t('textbf', content);
+        }
+        if (this.styles & Style.Underline) {
+            content = t('underline', content);
+        }
+        // it'd be weird if something was both subscript and superscript, but maybe?
+        if (this.styles & Style.Subscript) {
+            content = t('textsubscript', content);
+        }
+        if (this.styles & Style.Superscript) {
+            content = t('textsuperscript', content);
+        }
+        return content;
     };
     /** modifies this WordContainer's children so that contiguous WordSpan
     objects with the congruent styles are merged into a single WordSpan.
@@ -14052,6 +14221,37 @@ var XParagraph = (function (_super) {
     return XParagraph;
 })(XNode);
 exports.XParagraph = XParagraph;
+var XExample = (function (_super) {
+    __extends(XExample, _super);
+    function XExample() {
+        _super.apply(this, arguments);
+    }
+    XExample.prototype.toVNode = function () {
+        var properties = this.getProperties();
+        properties['title'] = "label=" + this.label;
+        return virtual_dom_1.h('div.paragraph.example', properties, this.getContent());
+    };
+    return XExample;
+})(XParagraph);
+exports.XExample = XExample;
+var XReference = (function (_super) {
+    __extends(XReference, _super);
+    function XReference(code, childNodes, textContent, styles) {
+        if (childNodes === void 0) { childNodes = []; }
+        if (textContent === void 0) { textContent = null; }
+        if (styles === void 0) { styles = 0; }
+        _super.call(this, childNodes, textContent, styles);
+        this.code = code;
+    }
+    XReference.prototype.toVNode = function () {
+        // var bookmark = parser.bookmarks[complexField.code]
+        var properties = this.getProperties();
+        properties['title'] = "code=" + this.code;
+        return virtual_dom_1.h('span.reference', properties, this.getContent());
+    };
+    return XReference;
+})(XNode);
+exports.XReference = XReference;
 var XDocument = (function (_super) {
     __extends(XDocument, _super);
     function XDocument(metadata) {
@@ -14090,7 +14290,7 @@ var XEndnote = (function (_super) {
 })(XNode);
 exports.XEndnote = XEndnote;
 
-},{"virtual-dom":52}],85:[function(require,module,exports){
+},{"./latex":3,"virtual-dom":53}],86:[function(require,module,exports){
 /// <reference path="type_declarations/index.d.ts" />
 var virtual_dom_1 = require('virtual-dom');
 var JSZip = require('jszip');
@@ -14164,11 +14364,12 @@ app.config(function ($stateProvider, $urlRouterProvider) {
         url: '/xdoc',
         templateUrl: 'templates/xdoc.html',
         controller: 'xdocCtrl',
+    })
+        .state('latex', {
+        url: '/latex',
+        templateUrl: 'templates/latex.html',
+        controller: 'latexCtrl',
     });
-    // .state('validate', {
-    //   url: '/validate',
-    //   templateUrl: 'templates/validate.html',
-    // });
 });
 function readFileAsDataURL(file, callback) {
     var reader = new FileReader();
@@ -14246,12 +14447,15 @@ app.controller('wordFileCtrl', function ($scope, $state, $localStorage) {
 });
 app.controller('xdocCtrl', function ($scope, $localStorage) {
     $scope.$storage = $localStorage;
-    $scope.$watch('$storage.file.arraybuffer', function (arraybuffer) {
-        if (arraybuffer && arraybuffer.byteLength > 0) {
-            var parser = new docx.Parser(arraybuffer);
-            $scope.document = parser.document;
-        }
-    });
+    var parser = new docx.Parser($scope.$storage.file.arraybuffer);
+    $scope.document = parser.document;
+});
+app.controller('latexCtrl', function ($scope, $localStorage) {
+    $scope.$storage = $localStorage;
+    $scope.timestamp = new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '');
+    var parser = new docx.Parser($scope.$storage.file.arraybuffer);
+    var document = parser.document;
+    $scope.latex = document.toLaTeX();
 });
 app.directive('xdomDocument', function () {
     return {
@@ -14284,44 +14488,54 @@ app.directive('xdomDocument', function () {
         }
     };
 });
-function mapNodes(nodes, func) {
+function list(array) {
     var result = [];
-    for (var i = 0, node; (node = nodes[i]); i++) {
-        result.push(func(node));
+    for (var i = 0, item; (item = array[i]); i++) {
+        result.push(item);
     }
     return result;
 }
-function mapAttributes(attributes, func) {
-    var result = [];
-    for (var i = 0, attr; (attr = attributes[i]); i++) {
-        result.push(func(attr));
+var XMLRenderer = (function () {
+    function XMLRenderer(blacklist) {
+        if (blacklist === void 0) { blacklist = []; }
+        this.blacklist = blacklist;
     }
-    return result;
-}
-function renderAttributes(attributes) {
-    return mapAttributes(attributes, function (attr) { return virtual_dom_1.h('span.attribute', [' ', virtual_dom_1.h('span.name', attr.name), '=', virtual_dom_1.h('span.value', "\"" + attr.value + "\"")]); });
-}
-function renderXmlNodes(nodes) {
-    return mapNodes(nodes, function (node) { return renderXmlNode(node); });
-}
-function renderXmlNode(node) {
-    if (node.nodeType == Node.TEXT_NODE) {
-        var text = node;
-        return virtual_dom_1.h('div.text', text.data);
-    }
-    else if (node.nodeType == Node.ELEMENT_NODE) {
-        var element = node;
-        var tagName = element.tagName;
-        var startTagChildren = ['<', tagName];
-        startTagChildren = startTagChildren.concat(renderAttributes(element.attributes)).concat('>');
-        var startTag = virtual_dom_1.h('span.start', startTagChildren);
-        var endTag = virtual_dom_1.h('span.end', {}, ['</', tagName, '>']);
-        return virtual_dom_1.h('div.element', [startTag, renderXmlNodes(node.childNodes), endTag]);
-    }
-    else {
-        return virtual_dom_1.h('span', "(Ignoring node type = " + node.nodeType + ")");
-    }
-}
+    XMLRenderer.prototype.renderAttributes = function (attributes) {
+        var _this = this;
+        return list(attributes).filter(function (attr) {
+            return _this.blacklist.indexOf(attr.name) == -1;
+        }).map(function (attr) { return virtual_dom_1.h('span.attribute', [' ', virtual_dom_1.h('span.name', attr.name), '=', virtual_dom_1.h('span.value', "\"" + attr.value + "\"")]); });
+    };
+    XMLRenderer.prototype.renderXmlNodes = function (nodes) {
+        var _this = this;
+        return list(nodes).filter(function (node) {
+            // return false for element nodes which have a blacklisted tag name
+            return (node.nodeType != Node.ELEMENT_NODE) || _this.blacklist.indexOf(node.tagName) == -1;
+        }).map(function (node) { return _this.renderXmlNode(node); });
+    };
+    XMLRenderer.prototype.renderXmlNode = function (node) {
+        if (node.nodeType == Node.TEXT_NODE) {
+            var text = node;
+            return virtual_dom_1.h('div.text', text.data);
+        }
+        else if (node.nodeType == Node.ELEMENT_NODE) {
+            var element = node;
+            var tagName = element.tagName;
+            var startTagChildren = [['<', tagName], this.renderAttributes(element.attributes), ['>']];
+            var startTag = virtual_dom_1.h('span.start', util_1.flatten(startTagChildren));
+            var endTag = virtual_dom_1.h('span.end', {}, ['</', tagName, '>']);
+            return virtual_dom_1.h('div.element', [startTag, this.renderXmlNodes(node.childNodes), endTag]);
+        }
+        else {
+            return virtual_dom_1.h('span', "(Ignoring node type = " + node.nodeType + ")");
+        }
+    };
+    XMLRenderer.prototype.render = function (xml) {
+        var document = new DOMParser().parseFromString(xml, 'application/xml');
+        return virtual_dom_1.h('div', this.renderXmlNodes(document.childNodes));
+    };
+    return XMLRenderer;
+})();
 app.directive('xmlTree', function () {
     return {
         restrict: 'E',
@@ -14345,8 +14559,17 @@ app.directive('xmlTree', function () {
             }
             scope.$watch('xml', function (xml) {
                 if (xml) {
-                    var document = new DOMParser().parseFromString(xml, 'application/xml');
-                    var new_vtree = virtual_dom_1.h('div', renderXmlNodes(document.childNodes));
+                    var blacklist = [
+                        // revision information
+                        'w:rsid', 'w:rsidR', 'w:rsidRDefault', 'w:rsidRPr', 'w:rsidP',
+                        // font information
+                        'w:rFonts', 'w:ascii', 'w:hAnsi', 'w:cs', 'w:bidi',
+                        // font size information
+                        'w:sz', 'w:szCs',
+                        // list item user interface config
+                        'w:nsid', 'w:multiLevelType', 'w:tmpl',
+                    ];
+                    var new_vtree = new XMLRenderer(blacklist).render(xml);
                     update(new_vtree);
                 }
             });
@@ -14354,4 +14577,4 @@ app.directive('xmlTree', function () {
     };
 });
 
-},{"./formats/docx":2,"./util":83,"coders":9,"jszip":18,"virtual-dom":52}]},{},[85]);
+},{"./formats/docx":2,"./util":84,"coders":10,"jszip":19,"virtual-dom":53}]},{},[86]);
