@@ -138,12 +138,28 @@ export class XNode {
 }
 
 export class XParagraph extends XNode {
+  pStyle: string;
   /**
   Output is similar to XNode's, but returns an actual HTML DOM element,
   a div.paragraph, rather than a document fragment
   */
   toVNode(): VNode {
-    return h('div.paragraph', this.getProperties(), this.getContent())
+    return h('div.paragraph', this.getProperties(),
+      [this.pStyle ? `pStyle=${this.pStyle}` : '', this.getContent()]);
+  }
+}
+
+export class XReference extends XNode {
+  constructor(public code: string,
+              childNodes: XNode[] = [],
+              textContent: string = null,
+              styles: number = 0) {
+    super(childNodes, textContent, styles);
+  }
+
+  toVNode(): VNode {
+    // var bookmark = parser.bookmarks[complexField.code]
+    return h('span.reference', this.getProperties(), this.getContent());
   }
 }
 

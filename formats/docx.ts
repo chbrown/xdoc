@@ -57,9 +57,9 @@ function dropNS(qualifiedName: string) {
 /**
 `properties` is an rPr or pPr element
 
-Returns a bitstring of xdom.Style flags
+Returns a number representing a bitstring of xdom.Style flags.
 */
-function readProperties(properties: Element): number {
+function readPropertiesStyles(properties: Element): number {
   var styles = 0;
   // everything we care about will an immediate child of the rPr or pPr
   eachChildElement(properties, child => {
@@ -74,6 +74,9 @@ function readProperties(properties: Element): number {
     else if (tag == 'b' && val != '0') {
       styles |= xdom.Style.Bold;
     }
+    else if (tag == 'u' && val == 'single') {
+      styles |= xdom.Style.Underline;
+    }
     else if (tag == 'vertAlign' && val == 'subscript') {
       styles |= xdom.Style.Subscript;
     }
@@ -85,9 +88,6 @@ function readProperties(properties: Element): number {
     }
     else if (tag == 'position' && val == '6') {
       styles |= xdom.Style.Superscript;
-    }
-    else if (tag == 'pStyle' && val == 'ListNumber') {
-      // styles |= xdom.Style.List;
     }
     else {
       // log(`Ignoring ${properties.tagName} > ${child.tagName}[val=${val}]`);
@@ -129,7 +129,11 @@ function readParagraph(paragraph_element: Element, context: Context, parser: Par
     var tag = dropNS(child.tagName);
 
     if (tag == 'pPr') {
-      context.stylesStack.top = readProperties(child);
+      context.stylesStack.top = readPropertiesStyles(child);
+      var pStyle = child.querySelector('pStyle');
+      if (pStyle) {
+        paragraph.pStyle = pStyle.getAttribute('w:val');
+      }
     }
     else if (tag == 'r') {
       // readRun will most often return a list of only one node
@@ -186,6 +190,7 @@ function readParagraph(paragraph_element: Element, context: Context, parser: Par
     }
   });
 
+  context.pStyle = null;
   context.stylesStack.pop();
 
   return paragraph;
@@ -206,8 +211,8 @@ function readRun(run: Element, context: Context, parser: Parser): xdom.XNode[] {
   eachChildElement(run, child => {
     var tag = dropNS(child.tagName);
     if (tag == 'rPr') {
-        // presumably, the rPr will occur before anything else (it does in all the docx xml I've come across)
-      context.stylesStack.top = readProperties(child);
+      // presumably, the rPr will occur before anything else (it does in all the docx xml I've come across)
+      context.stylesStack.top = readPropertiesStyles(child);
     }
     else if (tag == 'footnoteReference') {
       var footnote_id = child.getAttribute('w:id');
@@ -275,7 +280,7 @@ function readRun(run: Element, context: Context, parser: Parser): xdom.XNode[] {
       if (ref_match) {
         var ref = ref_match[1];
         var flags = ref_match[2];
-        log(`Setting complex field code to "${ref}" (ignoring flags: ${flags})`);
+        // log(`Setting complex field code to "${ref}" (ignoring flags: ${flags})`);
         // `context.complexFieldStateStack.top` should not be undefined, and
         // `context.complexFieldStateStack.top.separated` should be false
         context.complexFieldStack.top.code = ref;
@@ -304,13 +309,10 @@ function readRun(run: Element, context: Context, parser: Parser): xdom.XNode[] {
         // log('r > fldChar: fldCharType=end');
         var complexField = context.complexFieldStack.pop();
 
-        var bookmark = parser.bookmarks[complexField.code]
+        var field_node = new xdom.XReference(complexField.code, complexField.childNodes, null, context.currentStyles());
 
-        // new_style: `REF=${complexField.code}`
-        var field_node = new xdom.XNode(complexField.childNodes, null, context.currentStyles());
-
-        log('resolving fldChar REF code: "%s"', complexField.code);
-        log('field_node', field_node, 'bookmark', bookmark);
+        // log('resolving fldChar REF code: "%s"', complexField.code);
+        // log('field_node', field_node, 'bookmark', bookmark);
 
         nodes.push(field_node);
         // var change = child.find('{*}numberingChange');
@@ -360,6 +362,7 @@ class Context {
   complexFieldStack = new adts.Stack<ComplexField>();
   stylesStack = new adts.Stack<number>();
   bookmarkStack = new adts.Stack<Bookmark>();
+  pStyle: string;
 
   /** Combines all styles in the stack */
   currentStyles(): number {
