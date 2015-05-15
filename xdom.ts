@@ -138,14 +138,18 @@ export class XNode {
 }
 
 export class XParagraph extends XNode {
-  pStyle: string;
   /**
   Output is similar to XNode's, but returns an actual HTML DOM element,
   a div.paragraph, rather than a document fragment
   */
   toVNode(): VNode {
-    return h('div.paragraph', this.getProperties(),
-      [this.pStyle ? `pStyle=${this.pStyle}` : '', this.getContent()]);
+    return h('div.paragraph', this.getProperties(), this.getContent());
+  }
+}
+
+export class XExample extends XParagraph {
+  toVNode(): VNode {
+    return h('div.paragraph.example', this.getProperties(), this.getContent());
   }
 }
 

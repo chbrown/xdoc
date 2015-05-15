@@ -20,12 +20,13 @@ nav[fixedflow] .tab.current,nav[fixedflow] .tab:hover{background-color:#FDFDFD}
 table.map td{border-bottom:1px solid rgba(0,0,0,.05)}
 table.map tr:last-child td{border-bottom:none}
 .document{padding:5px;font-family:"Times New Roman",Serif;background-color:#89A}
-.document span{outline:1px solid #ffb6c1}
 .document .paragraph{min-height:1.2em;margin:5px 0;padding:2px;white-space:pre-wrap;background-color:#fff}
+.document .example{counter-increment:example}
+.document .example:before{content:"(" counter(example)") "}
 .document .reference{background-color:#87ceeb}
 .document .endnote,.document .footnote{display:block;margin:5px 0;padding:2px;font-size:smaller;background-color:#ccc}
-.document.labeled .endnote:before,.document.labeled .footnote:before,.document.labeled .paragraph:before{padding:0 2px;font-variant:small-caps}
-.document.labeled .paragraph:before{content:'¶'}
+.document.outlined span{outline:1px solid #ffb6c1}
+.document.labeled .endnote:before,.document.labeled .footnote:before{padding:0 2px;font-variant:small-caps}
 .document.labeled .footnote:before{content:'Footnote'}
 .document.labeled .endnote:before{content:'Endnote'}
 .xml{font-size:11px;font-family:Consolas,Monaco,Menlo,monospace}

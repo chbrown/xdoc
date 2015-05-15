@@ -8,5 +8,8 @@
 <section class="hpad">
   <h2>Document</h2>
 
-  <div class="document labeled" xdom-document="document"></div>
+  <label><input type="checkbox" ng-model="$storage.labeled"> Show labels</label>
+  <label><input type="checkbox" ng-model="$storage.outlined"> Show outlines</label>
+
+  <div class="document" ng-class="{labeled: $storage.labeled, outlined: $storage.outlined}" xdom-document="document"></div>
 </section>

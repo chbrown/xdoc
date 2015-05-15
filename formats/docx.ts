@@ -132,7 +132,13 @@ function readParagraph(paragraph_element: Element, context: Context, parser: Par
       context.stylesStack.top = readPropertiesStyles(child);
       var pStyle = child.querySelector('pStyle');
       if (pStyle) {
-        paragraph.pStyle = pStyle.getAttribute('w:val');
+        var pStyle_val = pStyle.getAttribute('w:val');
+        if (pStyle_val == 'ListNumber') {
+          paragraph = new xdom.XExample(paragraph.childNodes, paragraph.textContent, paragraph.styles);
+        }
+        else {
+          log('ignoring pPr > pStyle', pStyle_val);
+        }
       }
     }
     else if (tag == 'r') {
@@ -190,7 +196,6 @@ function readParagraph(paragraph_element: Element, context: Context, parser: Par
     }
   });
 
-  context.pStyle = null;
   context.stylesStack.pop();
 
   return paragraph;
@@ -362,7 +367,6 @@ class Context {
   complexFieldStack = new adts.Stack<ComplexField>();
   stylesStack = new adts.Stack<number>();
   bookmarkStack = new adts.Stack<Bookmark>();
-  pStyle: string;
 
   /** Combines all styles in the stack */
   currentStyles(): number {

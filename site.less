@@ -113,10 +113,6 @@ table.map {
   font-family: "Times New Roman", Serif;
   background-color: #89A;
 
-  span {
-    outline: 1px solid lightpink;
-  }
-
   .paragraph {
     // empty paragraphs should still take up vertical space
     min-height: 1.2em;
@@ -126,6 +122,14 @@ table.map {
 
     white-space: pre-wrap;
     background-color: white;
+  }
+
+  // counter-reset: example;
+  .example {
+    counter-increment: example;
+    &:before {
+      content: "(" counter(example) ") ";
+    }
   }
 
   .reference {
@@ -140,13 +144,16 @@ table.map {
     background-color: #ccc;
   }
 
+  // outlined and labeled control the level of debug styling shown on the document view
+  &.outlined {
+    span {
+      outline: 1px solid lightpink;
+    }
+  }
   &.labeled {
-    .paragraph:before, .footnote:before, .endnote:before {
+    .footnote:before, .endnote:before {
       padding: 0 2px;
       font-variant: small-caps;
-    }
-    .paragraph:before {
-      content: '¶';
     }
     .footnote:before {
       content: 'Footnote';
