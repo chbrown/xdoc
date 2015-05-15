@@ -1,5 +1,10 @@
 export const log = console.log.bind(console);
 
+/** from MDN */
+export function escapeRegExp(raw: string): string {
+  return raw.replace(/([.*+?^=!:${}()|[\]\/\\])/g, '\\$1');
+};
+
 // pushAll, flatten, and flatMap come from pdfi/Arrays
 
 export function pushAll<T>(array: T[], items: T[]): void {
