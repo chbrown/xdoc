@@ -5,5 +5,6 @@
 /// <reference path="DefinitelyTyped/virtual-dom/virtual-dom.d.ts" />
 
 /// <reference path="../node_modules/adts/adts.d.ts" />
+/// <reference path="../node_modules/coders/coders.d.ts" />
 
 interface Map<V> { [index: string]: V }

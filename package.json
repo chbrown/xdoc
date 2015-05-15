@@ -14,6 +14,7 @@
   "license": "MIT",
   "dependencies": {
     "adts": "*",
+    "coders": "*",
     "jszip": "*",
     "lodash": "*",
     "virtual-dom": "*",
