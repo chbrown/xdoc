@@ -290,11 +290,13 @@ app.directive('xmlTree', () => {
         if (xml) {
           var blacklist = [
             // revision information
-            'w:rsidR', 'w:rsidRDefault', 'w:rsidRPr', 'w:rsidP',
+            'w:rsid', 'w:rsidR', 'w:rsidRDefault', 'w:rsidRPr', 'w:rsidP',
             // font information
             'w:rFonts', 'w:ascii', 'w:hAnsi', 'w:cs', 'w:bidi',
             // font size information
             'w:sz', 'w:szCs',
+            // list item user interface config
+            'w:nsid', 'w:multiLevelType', 'w:tmpl',
           ];
           var new_vtree = new XMLRenderer(blacklist).render(xml);
           update(new_vtree);
