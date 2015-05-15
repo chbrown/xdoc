@@ -149,18 +149,21 @@ table.map {
   }
 }
 
-xml-tree {
+.xml {
   font-size: 11px;
   font-family: Consolas, Monaco, Menlo, monospace;
   .element {
     margin-left: 1em;
   }
   .attribute {
-    color: magenta;
     &:before {
       content: ' ';
     }
+    .name {
+      color: magenta;
+    }
     .value {
+      color: darkmagenta;
       &:before, &:after {
         content: '"';
       }
