@@ -95,25 +95,6 @@ nav[fixedflow] {
   white-space: pre-wrap;
 }
 
-.delete {
-  cursor: pointer;
-  text-decoration: line-through;
-}
-.delete, del {
-  color: #A00;
-}
-.insert {
-  cursor: pointer;
-  text-decoration: underline;
-}
-.insert, ins {
-  color: #0A0;
-}
-
-.focus {
-  box-shadow: 0 0 6px rgba(81, 203, 238, 1);
-}
-
 table.map {
   td {
     border-bottom: 1px solid rgba(0%, 0%, 0%, 5%);
@@ -127,35 +108,42 @@ table.map {
 }
 
 .document {
+  padding: 5px;
   font-family: "Times New Roman", Serif;
-
-  span {
-    border: 1px solid pink;
-  }
+  background-color: #89A;
 
   .paragraph {
     // empty paragraphs should still take up vertical space
     min-height: 1.2em;
 
-    margin: 1px;
-    border: 1px solid gray;
+    margin: 5px 0;
+    padding: 2px;
+
     white-space: pre-wrap;
+    background-color: white;
   }
-  .bold {
-    font-weight: bold;
+
+  .footnote, .endnote {
+    display: block;
+    margin: 5px 0;
+    padding: 2px;
+    font-size: smaller;
+    background-color: #ccc;
   }
-  .italic {
-    font-style: italic;
-  }
-  .underline {
-    text-decoration: underline;
-  }
-  .footnote {
-    color: blue;
-    margin: 1px;
-    border: 1px solid blue;
-  }
-  .endnote {
-    color: green;
+
+  &.labeled {
+    .paragraph:before, .footnote:before, .endnote:before {
+      padding: 0 2px;
+      font-variant: small-caps;
+    }
+    .paragraph:before {
+      content: '¶';
+    }
+    .footnote:before {
+      content: 'Footnote';
+    }
+    .endnote:before {
+      content: 'Endnote';
+    }
   }
 }

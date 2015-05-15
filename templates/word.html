@@ -5,10 +5,15 @@
       <input type="file">
     </label>
   </form>
+
+  <section>
+    <label><input type="checkbox" ng-model="$storage.showFileStats"> Show file stats</label>
+    <label><input type="checkbox" ng-model="$storage.showMetadata"> Show metadata</label>
+  </section>
 </section>
 
-<section class="hpad">
-  <div><b>Stored file:</b></div>
+<section class="hpad" ng-show="$storage.showFileStats">
+  <h3>Stored file</h3>
   <ul>
     <li>Modified: {{$storage.file.lastModifiedDate | date:'MMMM d, y h:mm a'}}</li>
     <li>Filename: {{$storage.file.name}}</li>
@@ -18,10 +23,8 @@
   </ul>
 </section>
 
-<hr>
-
-<section class="hpad">
-  <h2>Document Metadata</h2>
+<section class="hpad" ng-show="$storage.showMetadata">
+  <h3>Document metadata</h3>
   <ul>
     <li ng-repeat="(key, value) in document.metadata">{{key}}: {{value}}</li>
   </ul>
@@ -30,5 +33,5 @@
 <section class="hpad">
   <h2>Document</h2>
 
-  <div class="document" xdom-document="document"></div>
+  <div class="document labeled" xdom-document="document"></div>
 </section>

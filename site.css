@@ -17,18 +17,12 @@ nav[fixedflow] .tab{display:inline-block;padding:2px 6px;margin:3px 0 0 0;border
 nav[fixedflow] .tab.current,nav[fixedflow] .tab:hover{background-color:#FDFDFD}
 .wrap{word-break:break-all}
 .raw{white-space:pre-wrap}
-.delete{cursor:pointer;text-decoration:line-through}
-.delete,del{color:#A00}
-.insert{cursor:pointer;text-decoration:underline}
-.insert,ins{color:#0A0}
-.focus{box-shadow:0 0 6px #51cbee}
 table.map td{border-bottom:1px solid rgba(0,0,0,.05)}
 table.map tr:last-child td{border-bottom:none}
-.document{font-family:"Times New Roman",Serif}
-.document span{border:1px solid pink}
-.document .paragraph{min-height:1.2em;margin:1px;border:1px solid gray;white-space:pre-wrap}
-.document .bold{font-weight:700}
-.document .italic{font-style:italic}
-.document .underline{text-decoration:underline}
-.document .footnote{color:#00f;margin:1px;border:1px solid #00f}
-.document .endnote{color:green}
+.document{padding:5px;font-family:"Times New Roman",Serif;background-color:#89A}
+.document .paragraph{min-height:1.2em;margin:5px 0;padding:2px;white-space:pre-wrap;background-color:#fff}
+.document .endnote,.document .footnote{display:block;margin:5px 0;padding:2px;font-size:smaller;background-color:#ccc}
+.document.labeled .endnote:before,.document.labeled .footnote:before,.document.labeled .paragraph:before{padding:0 2px;font-variant:small-caps}
+.document.labeled .paragraph:before{content:'¶'}
+.document.labeled .footnote:before{content:'Footnote'}
+.document.labeled .endnote:before{content:'Endnote'}
