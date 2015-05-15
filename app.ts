@@ -4,7 +4,7 @@ import {VNode, VChild, h, create, diff, patch} from 'virtual-dom';
 import JSZip = require('jszip');
 import docx = require('./formats/docx');
 import {base64} from 'coders';
-import {log} from './util';
+import {log, flatten} from './util';
 import xdom = require('./xdom');
 
 var Types = {};
@@ -213,48 +213,54 @@ app.directive('xdomDocument', () => {
   };
 });
 
-function mapNodes<T>(nodes: NodeList, func: (node: Node) => T) {
+function list<T>(array: {[index: number]: T}) {
   var result: T[] = [];
-  for (var i = 0, node: Node; (node = nodes[i]); i++) {
-    result.push(func(node));
+  for (var i = 0, item: T; (item = array[i]); i++) {
+    result.push(item);
   }
   return result;
 }
 
-function mapAttributes<T>(attributes: NamedNodeMap, func: (attr: Attr) => T) {
-  var result: T[] = [];
-  for (var i = 0, attr: Attr; (attr = attributes[i]); i++) {
-    result.push(func(attr));
-  }
-  return result;
-}
+class XMLRenderer {
+  constructor(public blacklist: string[] = []) { }
 
-function renderAttributes(attributes: NamedNodeMap) {
-  return mapAttributes(attributes, attr => h('span.attribute',
-    [' ', h('span.name', attr.name), '=', h('span.value', `"${attr.value}"`)]));
-}
+  protected renderAttributes(attributes: NamedNodeMap): VNode[] {
+    return list(attributes).filter(attr => {
+      return this.blacklist.indexOf(attr.name) == -1;
+    }).map(attr => h('span.attribute',
+      [' ', h('span.name', attr.name), '=', h('span.value', `"${attr.value}"`)]));
+  }
 
-function renderXmlNodes(nodes: NodeList) {
-  return mapNodes(nodes, (node: Node) => renderXmlNode(node));
-}
+  protected renderXmlNodes(nodes: NodeList): VNode[] {
+    return list(nodes).filter(node => {
+      // return false for element nodes which have a blacklisted tag name
+      return (node.nodeType != Node.ELEMENT_NODE) || this.blacklist.indexOf((<Element>node).tagName) == -1;
+    }).map(node => this.renderXmlNode(node));
+  }
 
-function renderXmlNode(node: Node) {
-  if (node.nodeType == Node.TEXT_NODE) {
-    var text = <Text>node;
-    return h('div.text', text.data);
+  protected renderXmlNode(node: Node) {
+    if (node.nodeType == Node.TEXT_NODE) {
+      var text = <Text>node;
+      return h('div.text', text.data);
+    }
+    else if (node.nodeType == Node.ELEMENT_NODE) {
+      var element = <Element>node;
+      var tagName = element.tagName;
+      var startTagChildren: VChild[][] = [['<', tagName], this.renderAttributes(element.attributes), ['>']];
+      var startTag = h('span.start', flatten(startTagChildren));
+      var endTag = h('span.end', {}, ['</', tagName, '>']);
+      return h('div.element', [startTag, this.renderXmlNodes(node.childNodes), endTag]);
+    }
+    else {
+      return h('span', `(Ignoring node type = ${node.nodeType})`);
+    }
   }
-  else if (node.nodeType == Node.ELEMENT_NODE) {
-    var element = <Element>node;
-    var tagName = element.tagName;
-    var startTagChildren: VChild[] = ['<', tagName];
-    startTagChildren = startTagChildren.concat(renderAttributes(element.attributes)).concat('>');
-    var startTag = h('span.start', startTagChildren);
-    var endTag = h('span.end', {}, ['</', tagName, '>']);
-    return h('div.element', [startTag, renderXmlNodes(node.childNodes), endTag]);
+
+  render(xml: string): VNode {
+    var document = new DOMParser().parseFromString(xml, 'application/xml');
+    return h('div', this.renderXmlNodes(document.childNodes));
   }
-  else {
-    return h('span', `(Ignoring node type = ${node.nodeType})`);
-  }
+
 }
 
 app.directive('xmlTree', () => {
@@ -282,8 +288,15 @@ app.directive('xmlTree', () => {
 
       scope.$watch('xml', (xml: string) => {
         if (xml) {
-          var document = new DOMParser().parseFromString(xml, 'application/xml');
-          var new_vtree = h('div', renderXmlNodes(document.childNodes));
+          var blacklist = [
+            // revision information
+            'w:rsidR', 'w:rsidRDefault', 'w:rsidRPr', 'w:rsidP',
+            // font information
+            'w:rFonts', 'w:ascii', 'w:hAnsi', 'w:cs', 'w:bidi',
+            // font size information
+            'w:sz', 'w:szCs',
+          ];
+          var new_vtree = new XMLRenderer(blacklist).render(xml);
           update(new_vtree);
         }
       });
