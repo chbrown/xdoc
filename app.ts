@@ -173,7 +173,8 @@ app.controller('xdocCtrl', ($scope, $localStorage) => {
 
   $scope.$watch('$storage.file.arraybuffer', (arraybuffer: ArrayBuffer) => {
     if (arraybuffer && arraybuffer.byteLength > 0) {
-      $scope.document = docx.parseXDocument(arraybuffer);
+      var parser = new docx.Parser(arraybuffer);
+      $scope.document = parser.document;
     }
   });
 });
