@@ -3,6 +3,7 @@ import _ = require('lodash');
 import adts = require('adts');
 import {VNode, VProperties, h} from 'virtual-dom';
 import {replacements, replacementRegExp} from './latex';
+import {pushAll} from './util';
 
 // We can do bitwise math in Javascript up to 2^29, so we can have up to
 // 29 styles
@@ -38,18 +39,39 @@ A fragment of a Document model; can be either a container,
 or, when extended, a node with some semantic role in a document.
 */
 export class XNode {
+  constructor() { }
+
+  toVNode(): VNode {
+    return h('span', '');
+  }
+  toLaTeX(): string {
+    return '';
+  }
+}
+
+export class XText extends XNode {
+  constructor(public data: string) { super() }
+
+  toVNode(): VNode {
+    return h('span', this.data);
+  }
+  toLaTeX(): string {
+    return stringToLaTeX(this.data);
+  }
+}
+
+export class XElement extends XNode {
   constructor(public childNodes: XNode[] = [],
-              public textContent: string = null,
-              public styles: number = 0) { }
+              public styles: number = 0) { super() }
 
   appendChild(newChild: XNode) {
     this.childNodes.push(newChild);
   }
   appendChildren(newChildren: XNode[]) {
-    Array.prototype.push.apply(this.childNodes, newChildren);
+    pushAll(this.childNodes, newChildren);
   }
 
-  getProperties(): VProperties {
+  getVProperties(): VProperties {
     // could be CSSStyleDeclaration but all the properties are required
     var style: StyleDeclaration = {};
     if (this.styles & Style.Italic) {
@@ -77,14 +99,12 @@ export class XNode {
 
     return {style: style, title: title};
   }
-  getContent() {
-    return this.textContent ? this.textContent : this.childNodes.map(childNode => childNode.toVNode());
-  }
   toVNode(): VNode {
-    return h('span', this.getProperties(), this.getContent());
+    return h('span', this.getVProperties(),
+      this.childNodes.map(childNode => childNode.toVNode()));
   }
   toLaTeX(): string {
-    var content = this.textContent ? stringToLaTeX(this.textContent) : this.childNodes.map(childNode => childNode.toLaTeX()).join('');
+    var content = this.childNodes.map(childNode => childNode.toLaTeX()).join('');
     if (this.styles & Style.Italic) {
       content = t('textit', content);
     }
@@ -171,42 +191,44 @@ export class XNode {
   }
 }
 
-export class XParagraph extends XNode {
+export class XParagraph extends XElement {
   /**
   Output is similar to XNode's, but returns an actual HTML DOM element,
   a div.paragraph, rather than a document fragment
   */
   toVNode(): VNode {
-    return h('div.paragraph', this.getProperties(), this.getContent());
+    return h('div.paragraph', this.getVProperties(),
+      this.childNodes.map(childNode => childNode.toVNode()));
   }
 }
 
 export class XExample extends XParagraph {
   label: string;
   toVNode(): VNode {
-    var properties = this.getProperties();
+    var properties = this.getVProperties();
     properties['title'] = `label=${this.label}`;
-    return h('div.paragraph.example', properties, this.getContent());
+    return h('div.paragraph.example', properties,
+      this.childNodes.map(childNode => childNode.toVNode()));
   }
 }
 
-export class XReference extends XNode {
+export class XReference extends XElement {
   constructor(public code: string,
               childNodes: XNode[] = [],
-              textContent: string = null,
               styles: number = 0) {
-    super(childNodes, textContent, styles);
+    super(childNodes, styles);
   }
 
   toVNode(): VNode {
     // var bookmark = parser.bookmarks[complexField.code]
-    var properties = this.getProperties();
+    var properties = this.getVProperties();
     properties['title'] = `code=${this.code}`;
-    return h('span.reference', properties, this.getContent());
+    return h('span.reference', properties,
+      this.childNodes.map(childNode => childNode.toVNode()));
   }
 }
 
-export class XDocument extends XNode {
+export class XDocument extends XElement {
   constructor(public metadata: Map<string>) { super() }
 }
 
@@ -217,14 +239,16 @@ basic string and maybe some styles.
 childNodes should always be empty.
 */
 
-export class XFootnote extends XNode {
+export class XFootnote extends XElement {
   toVNode(): VNode {
-    return h('span.footnote', this.getProperties(), this.getContent());
+    return h('span.footnote', this.getVProperties(),
+      this.childNodes.map(childNode => childNode.toVNode()));
   }
 }
 
-export class XEndnote extends XNode {
+export class XEndnote extends XElement {
   toVNode(): VNode {
-    return h('span.endnote', this.getProperties(), this.getContent());
+    return h('span.endnote', this.getVProperties(),
+      this.childNodes.map(childNode => childNode.toVNode()));
   }
 }

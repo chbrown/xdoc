@@ -10,18 +10,9 @@ import JSZip = require('jszip');
 import adts = require('adts');
 import xdom = require('../xdom');
 import characters = require('../characters');
-import {log, memoize} from '../util';
+import {log, memoize, list} from '../util';
 
-function eachChildElement(node: Node, func: (element: Element) => void) {
-  for (var i = 0, childNode: Node; (childNode = node.childNodes[i]); i++) {
-    if (childNode.nodeType == Node.ELEMENT_NODE) {
-      var element = <Element>childNode;
-      func(element);
-    }
-  }
-}
-
-class ComplexField extends xdom.XNode {
+class ComplexField extends xdom.XElement {
   /** `separated` is set to true when w:fldChar[fldCharType="separate"] is reached. */
   separated = false;
   /** `code` is set to the value of a <w:instrText> that contains a 'REF ...' value. */
@@ -30,8 +21,13 @@ class ComplexField extends xdom.XNode {
   constructor() { super() }
 }
 
-class Bookmark extends xdom.XNode {
+class Bookmark extends xdom.XElement {
   constructor(public id: string, public name: string) { super() }
+}
+
+function childElements(node: Node): Element[] {
+  var children = list(node.childNodes).filter(childNode => childNode.nodeType == Node.ELEMENT_NODE);
+  return <Element[]>children;
 }
 
 /**
@@ -62,7 +58,7 @@ Returns a number representing a bitstring of xdom.Style flags.
 function readPropertiesStyles(properties: Element): number {
   var styles = 0;
   // everything we care about will an immediate child of the rPr or pPr
-  eachChildElement(properties, child => {
+  childElements(properties).forEach(child => {
     var tag = dropNS(child.tagName);
     var val = child.getAttribute('w:val');
     // italics (and bold, but with w:b) can be
@@ -105,13 +101,11 @@ body will most often be a <w:body> element, but may also be a
 
 The returned node's .childNodes will be xdom.XParagraph objects.
 */
-function readBody(body: Element, context: Context, parser: Parser): xdom.XNode {
-  var container = new xdom.XNode();
-  eachChildElement(body, paragraph_element => {
-    var node = readParagraph(paragraph_element, context, parser);
-    container.appendChild(node);
-  });
-  return container;
+function readBody(body: Element, context: Context, parser: Parser): xdom.XElement {
+  var childNodes = list(body.childNodes)
+    .filter(childNode => childNode.nodeType == Node.ELEMENT_NODE)
+    .map((element: Element) => readParagraph(element, context, parser));
+  return new xdom.XElement(childNodes);
 }
 
 /**
@@ -120,12 +114,12 @@ p should be a DOM Element <w:p> from the original Word document XML.
 returns a single xdom.XNode, which will have a bunch of XNode children
 (which can then be joined based on style congruence)
 */
-function readParagraph(paragraph_element: Element, context: Context, parser: Parser): xdom.XNode {
+function readParagraph(paragraph_element: Element, context: Context, parser: Parser): xdom.XParagraph {
   var paragraph = new xdom.XParagraph();
   context.stylesStack.push(0);
 
   // we need to read w:p's children in a loop, because each w:p's is not a constituent
-  eachChildElement(paragraph_element, child => {
+  childElements(paragraph_element).forEach(child => {
     var tag = dropNS(child.tagName);
 
     if (tag == 'pPr') {
@@ -134,7 +128,7 @@ function readParagraph(paragraph_element: Element, context: Context, parser: Par
       if (pStyle) {
         var pStyle_val = pStyle.getAttribute('w:val');
         if (pStyle_val == 'ListNumber') {
-          paragraph = new xdom.XExample(paragraph.childNodes, paragraph.textContent, paragraph.styles);
+          paragraph = new xdom.XExample(paragraph.childNodes, paragraph.styles);
         }
         else {
           log('ignoring pPr > pStyle', pStyle_val);
@@ -164,7 +158,7 @@ function readParagraph(paragraph_element: Element, context: Context, parser: Par
       // you can use the w:hyperlink[@r:id] value and _rels/document.xml.rels to resolve it,
       // but for now I just read the raw link
       // context.pushStyles(['hyperlink']);
-      eachChildElement(child, hyperlink_child => {
+      childElements(child).forEach(hyperlink_child => {
         readRun(hyperlink_child, context, parser).forEach(node => paragraph.appendChild(node));
       });
       // context.popStyles();
@@ -218,7 +212,7 @@ function readRun(run: Element, context: Context, parser: Parser): xdom.XNode[] {
   // an <w:r> will generally contain only one interesting element besides rPr,
   //   e.g., text, footnote reference, endnote reference, or a symbol
   //   but we still iterate through them all; more elegant than multiple find()'s
-  eachChildElement(run, child => {
+  childElements(run).forEach(child => {
     var tag = dropNS(child.tagName);
     if (tag == 'rPr') {
       // presumably, the rPr will occur before anything else (it does in all the docx xml I've come across)
@@ -252,21 +246,21 @@ function readRun(run: Element, context: Context, parser: Parser): xdom.XNode[] {
       }
       else {
         log('r > sym: %s', shifted_char_code, font);
+        // logger.critical('Could not find symbol in map: %r' % char)
+        // replacement = u'MISSING SYMBOL (%r)' % char
         text = shifted_char_code; // symbol_map.get(sym_char)
       }
 
-      // if replacement is None:
-      //     logger.critical('Could not find symbol in map: %r' % char)
-      //     replacement = u'MISSING SYMBOL (%r)' % char
-      var sym_node = new xdom.XNode([], text, context.currentStyles());
+
+      var sym_node = new xdom.XElement([new xdom.XText(text)], context.currentStyles());
       nodes.push(sym_node);
     }
     else if (tag == 't') {
-      var t_node = new xdom.XNode([], child.textContent, context.currentStyles());
+      var t_node = new xdom.XElement([new xdom.XText(child.textContent)], context.currentStyles());
       nodes.push(t_node);
     }
     else if (tag == 'tab') {
-      var tab_node = new xdom.XNode([], '\t', context.currentStyles());
+      var tab_node = new xdom.XElement([new xdom.XText('\t')], context.currentStyles());
       nodes.push(tab_node);
     }
     else if (tag == 'instrText') {
@@ -319,7 +313,7 @@ function readRun(run: Element, context: Context, parser: Parser): xdom.XNode[] {
         // log('r > fldChar: fldCharType=end');
         var complexField = context.complexFieldStack.pop();
 
-        var field_node = new xdom.XReference(complexField.code, complexField.childNodes, null, context.currentStyles());
+        var field_node = new xdom.XReference(complexField.code, complexField.childNodes, context.currentStyles());
 
         // log('resolving fldChar REF code: "%s"', complexField.code);
         // log('field_node', field_node, 'bookmark', bookmark);
@@ -355,8 +349,7 @@ function readRun(run: Element, context: Context, parser: Parser): xdom.XNode[] {
       // should this equate to some kind of page break? I don't think so.
     }
     else if (tag == 'br') {
-      // TODO: should this be a line break of some sort?
-      var break_node = new xdom.XNode([], '\n', context.currentStyles());
+      var break_node = new xdom.XElement([new xdom.XText('\n')], context.currentStyles());
       nodes.push(break_node);
     }
     else {
@@ -383,8 +376,7 @@ export class Parser {
   /** bookmarks are indexed by their name, not their id */
   bookmarks: {[index: string]: Bookmark} = {};
 
-  constructor(arraybuffer: ArrayBuffer, public zip = new JSZip(arraybuffer)) {
-  }
+  constructor(arraybuffer: ArrayBuffer, public zip = new JSZip(arraybuffer)) { }
 
   get document() {
     var doc = new xdom.XDocument(this.metadata);
@@ -393,9 +385,9 @@ export class Parser {
     // <w:p> elements (paragraphs)
     var file = this.zip.file('word/document.xml')
     var documentBody = parseXML(file.asText()).documentElement.firstElementChild;
-    eachChildElement(documentBody, childNode => {
+    childElements(documentBody).forEach(child => {
       var context = new Context();
-      var paragraph_node = readParagraph(childNode, context, this);
+      var paragraph_node = readParagraph(child, context, this);
       doc.appendChild(paragraph_node);
     });
     return doc;
@@ -414,11 +406,11 @@ export class Parser {
     // The footnotes.xml file may not exist.
     if (file) {
       var document = parseXML(file.asText());
-      eachChildElement(document.documentElement, note => {
-        var id = note.getAttribute('w:id');
+      childElements(document.documentElement).forEach(child => {
+        var id = child.getAttribute('w:id');
         // each w:footnote has a bunch of w:p children, like a w:body
         var context = new Context();
-        var container = readBody(note, context, this);
+        var container = readBody(child, context, this);
         footnotes[id] = new xdom.XFootnote(container.childNodes);
       });
     }
@@ -435,10 +427,10 @@ export class Parser {
     // The endnotes.xml file may not exist.
     if (file) {
       var document = parseXML(file.asText());
-      eachChildElement(document.documentElement, note => {
-        var id = note.getAttribute('w:id');
+      childElements(document.documentElement).forEach(child => {
+        var id = child.getAttribute('w:id');
         var context = new Context();
-        var container = readBody(note, context, this);
+        var container = readBody(child, context, this);
         endnotes[id] = new xdom.XFootnote(container.childNodes);
       });
     }
@@ -461,7 +453,7 @@ export class Parser {
     // In case the file does not exist:
     if (file) {
       var document = parseXML(file.asText());
-      eachChildElement(document.documentElement, child => {
+      childElements(document.documentElement).forEach(child => {
         var tag = dropNS(child.tagName);
         metadata[tag] = child.textContent;
       });
@@ -491,7 +483,7 @@ export class Parser {
     // In case the file does not exist:
     if (file) {
       var document = parseXML(file.asText());
-      eachChildElement(document.documentElement, child => {
+      childElements(document.documentElement).forEach(child => {
         var id = child.getAttribute('Id');
         relationships[id] = child.getAttribute('Target');
       });
