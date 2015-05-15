@@ -5,6 +5,20 @@ export function escapeRegExp(raw: string): string {
   return raw.replace(/([.*+?^=!:${}()|[\]\/\\])/g, '\\$1');
 };
 
+/**
+Take anything that can be indexed by number and returns a new copied Array of
+elements of that type.
+
+Useful for things like NodeLists.
+*/
+export function list<T>(array: {[index: number]: T}) {
+  var result: T[] = [];
+  for (var i = 0, item: T; (item = array[i]) !== undefined; i++) {
+    result.push(item);
+  }
+  return result;
+}
+
 // pushAll, flatten, and flatMap come from pdfi/Arrays
 
 export function pushAll<T>(array: T[], items: T[]): void {

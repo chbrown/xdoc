@@ -4,7 +4,7 @@ import {VNode, VChild, h, create, diff, patch} from 'virtual-dom';
 import JSZip = require('jszip');
 import docx = require('./formats/docx');
 import {base64} from 'coders';
-import {log, flatten} from './util';
+import {log, flatten, list} from './util';
 import xdom = require('./xdom');
 
 var Types = {};
@@ -224,14 +224,6 @@ app.directive('xdomDocument', () => {
     }
   };
 });
-
-function list<T>(array: {[index: number]: T}) {
-  var result: T[] = [];
-  for (var i = 0, item: T; (item = array[i]); i++) {
-    result.push(item);
-  }
-  return result;
-}
 
 class XMLRenderer {
   constructor(public blacklist: string[] = []) { }
