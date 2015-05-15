@@ -3,7 +3,8 @@ import _ = require('lodash');
 import adts = require('adts');
 import {VNode, VProperties, h} from 'virtual-dom';
 
-// We can do bitwise math in Javascript up to 2^29
+// We can do bitwise math in Javascript up to 2^29, so we can have up to
+// 29 styles
 // 2 << 29 ==  1073741824 == 2^30
 // 2 << 30 == -2147483648 != 2^31
 export enum Style {
@@ -67,6 +68,9 @@ export class XNode {
   }
   appendChild(newChild: XNode) {
     this.childNodes.push(newChild);
+  }
+  appendChildren(newChildren: XNode[]) {
+    Array.prototype.push.apply(this.childNodes, newChildren);
   }
   /** modifies this WordContainer's children so that contiguous WordSpan
   objects with the congruent styles are merged into a single WordSpan.
@@ -140,10 +144,6 @@ export class XParagraph extends XNode {
   */
   toVNode(): VNode {
     return h('div.paragraph', this.getProperties(), this.getContent())
-  }
-  /** Returns a string */
-  toTeX(): string {
-    throw new Error('Not yet implemented');
   }
 }
 
