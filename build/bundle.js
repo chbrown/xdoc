@@ -14074,12 +14074,26 @@ or, when extended, a node with some semantic role in a document.
 var XNode = (function () {
     function XNode() {
     }
-    XNode.prototype.toVNode = function () {
+    Object.defineProperty(XNode.prototype, "textContent", {
+        get: function () {
+            return '';
+        },
+        enumerable: true,
+        configurable: true
+    });
+    XNode.prototype.isWhitespace = function () {
+        return true;
+    };
+    XNode.prototype.toVChild = function () {
         return virtual_dom_1.h('span', '');
     };
     XNode.prototype.toLaTeX = function () {
         return '';
     };
+    /**
+    The basic normalization is a no-op.
+    */
+    XNode.prototype.normalize = function () { };
     return XNode;
 })();
 exports.XNode = XNode;
@@ -14089,8 +14103,18 @@ var XText = (function (_super) {
         _super.call(this);
         this.data = data;
     }
-    XText.prototype.toVNode = function () {
-        return virtual_dom_1.h('span', this.data);
+    Object.defineProperty(XText.prototype, "textContent", {
+        get: function () {
+            return this.data;
+        },
+        enumerable: true,
+        configurable: true
+    });
+    XText.prototype.isWhitespace = function () {
+        return /^\s+$/.test(this.data);
+    };
+    XText.prototype.toVChild = function () {
+        return this.data;
     };
     XText.prototype.toLaTeX = function () {
         return stringToLaTeX(this.data);
@@ -14107,6 +14131,23 @@ var XElement = (function (_super) {
         this.childNodes = childNodes;
         this.styles = styles;
     }
+    Object.defineProperty(XElement.prototype, "textContent", {
+        get: function () {
+            // this check and throw is kind of rude
+            // if (!this.containsOnlyText()) {
+            //   throw new Error('Cannot get textContent of XElement with non-XText childNodes');
+            // }
+            return this.childNodes.map(function (childNode) { return childNode.textContent; }).join('');
+        },
+        enumerable: true,
+        configurable: true
+    });
+    XElement.prototype.isWhitespace = function () {
+        return this.childNodes.every(function (childNode) { return childNode.isWhitespace(); });
+    };
+    XElement.prototype.containsOnlyText = function () {
+        return this.childNodes.every(function (childNode) { return childNode instanceof XText; });
+    };
     XElement.prototype.appendChild = function (newChild) {
         this.childNodes.push(newChild);
     };
@@ -14138,8 +14179,8 @@ var XElement = (function (_super) {
         var title = undefined; // this.styles.toJSON().join('; ') ||
         return { style: style, title: title };
     };
-    XElement.prototype.toVNode = function () {
-        return virtual_dom_1.h('span', this.getVProperties(), this.childNodes.map(function (childNode) { return childNode.toVNode(); }));
+    XElement.prototype.toVChild = function () {
+        return virtual_dom_1.h('span.element', this.getVProperties(), this.childNodes.map(function (childNode) { return childNode.toVChild(); }));
     };
     XElement.prototype.toLaTeX = function () {
         var content = this.childNodes.map(function (childNode) { return childNode.toLaTeX(); }).join('');
@@ -14161,12 +14202,55 @@ var XElement = (function (_super) {
         }
         return content;
     };
-    /** modifies this WordContainer's children so that contiguous WordSpan
-    objects with the congruent styles are merged into a single WordSpan.
-    This is mostly about whitespace; smoothing out whitespace where possible to
-    match neighbors.
+    XElement.prototype.normalize = function () {
+        this.childNodes.forEach(function (childNode) { return childNode.normalize(); });
+    };
+    return XElement;
+})(XNode);
+exports.XElement = XElement;
+/**
+Output is similar to XNode's, but returns an actual HTML DOM element,
+a div.paragraph, rather than a document fragment.
+
+Paragraphs can only have XElements (and subclasses) as children, never naked
+XText nodes.
+*/
+var XParagraph = (function (_super) {
+    __extends(XParagraph, _super);
+    function XParagraph(childNodes, styles) {
+        if (childNodes === void 0) { childNodes = []; }
+        if (styles === void 0) { styles = 0; }
+        _super.call(this, childNodes, styles);
+        this.labels = [];
+    }
+    XParagraph.prototype.toVChild = function () {
+        var properties = this.getVProperties();
+        properties['title'] = "labels=" + this.labels.join(',');
+        return virtual_dom_1.h('div.paragraph', properties, this.childNodes.map(function (childNode) { return childNode.toVChild(); }));
+    };
+    XParagraph.prototype.toLaTeX = function () {
+        return '\n' + _super.prototype.toLaTeX.call(this) + this.labels.map(function (label) { return t('label', label); }).join('') + '\n';
+    };
+    /**
+    We will generally normalize a XParagraph's children, which are most often
+    plain XElements that have one child: an XText. This is the typical
+    representation of text runs (w:r) within a text paragraph (w:p).
   
-    It's easiest to modify existing Span objects, so style cleaning is done in-place
+    We want to take groups of these XElements that have the same styles, and merge
+    them into a single XElement with multiple XText children.
+  
+    We do this because Word's text runs (w:r) are often needlessly broken into
+    several identically styled subsequences.
+  
+    It also produces more pleasant whitespace. Since most whitespace looks the same,
+    whether it's normal, bold, italic, or anything else, Word will often create
+    superfluous subsequences so that the whitespace runs and their surroundings
+    are broken into several subsequences, though there is no reason to do so.
+  
+    You don't notice this in Word, because you don't see the styling markup, but
+    it often produces very ugly LaTeX.
+  
+    Normalization is currently done in-place, since that's easier.
   
     * Find groups of contiguous styles (whitespace has flexible styles),
       but de-style whitespace outside such groups.
@@ -14174,75 +14258,54 @@ var XElement = (function (_super) {
       adopt the styles of the most recent non-whitespace span, but that
       isn't pretty.
   
-     TODO: fix implementation
+    TODO: shave off trailing whitespace, so that whitespace is unstyled whenever possible.
     */
-    XElement.prototype.normalize = function () {
-        throw new Error('Not yet implemented');
-        // inner_spans and outer_spans are temporary lists of spans
-        // var inner_spans = [];
-        // var outer_spans = [];
-        // // var current_styles = [];
-        // _.each(this.spans, function(span) {
-        //   // we only want spans that are empty / only whitespace
-        //   if (span.isWhitespace()) {
-        //     outer_spans.push(span);
-        //   }
-        //   else if (_.xor(span.styles, current_styles).length > 0) {
-        //     // if this span's styles are the same as the current styles
-        //     // a non-empty span with identical styles triggers:
-        //     // merging outer_spans into inner_spans
-        //     inner_spans = inner_spans.concat(outer_spans);
-        //     outer_spans = [];
-        //   }
-        //   else {
-        //     // a non-empty span with new styles triggers:
-        //     // 1) applying current_styles to all inner_spans
-        //     for (span in inner_spans) {
-        //       span.styles = current_styles;
-        //     }
-        //     inner_spans = []
-        //     // 2) erasing all styles from outer_spans
-        //     for span in outer_spans:
-        //         span.styles = set()
-        //     outer_spans = []
-        //     // 3) setting current_styles
-        //     current_styles = span.styles
-        //   }
-        // });
-        // // now that the styles are all sanitized and updated, we can use the standard groupby
-        // span_group_iter = itertools.groupby(self.spans, lambda span: span.styles)
-        // self.spans = [Span.merge(span_group) for styles, span_group in span_group_iter]
-        // return this;
-        // WordSpan....merge = function(spans) {
-        //   /** WordSpan.merge takes a list of spans, joins all of the text together,
-        //      and only keeps the attributes
-        //   */
-        //   var first = spans[0];
-        //   if (first === undefined) throw new Error('You cannot merge an empty list');
-        //   var text = _.pluck(spans, 'text').join('');
-        //   return new WordSpan(text, first.styles, first.attrs);
-        // };
-    };
-    return XElement;
-})(XNode);
-exports.XElement = XElement;
-/**
-Output is similar to XNode's, but returns an actual HTML DOM element,
-a div.paragraph, rather than a document fragment
-*/
-var XParagraph = (function (_super) {
-    __extends(XParagraph, _super);
-    function XParagraph() {
-        _super.apply(this, arguments);
-        this.labels = [];
-    }
-    XParagraph.prototype.toVNode = function () {
-        var properties = this.getVProperties();
-        properties['title'] = "labels=" + this.labels.join(',');
-        return virtual_dom_1.h('div.paragraph', properties, this.childNodes.map(function (childNode) { return childNode.toVNode(); }));
-    };
-    XParagraph.prototype.toLaTeX = function () {
-        return '\n' + _super.prototype.toLaTeX.call(this) + this.labels.map(function (label) { return t('label', label); }).join('') + '\n';
+    XParagraph.prototype.normalize = function () {
+        // normalized_childNodes will replace this XParagraph's childNodes when complete
+        var normalized_childNodes = [];
+        // buffer and buffer_styles will be periodically flushed
+        var buffer = [];
+        // `buffer_styles` could be computed from `buffer` each time it's needed,
+        // but it's just as easy to keep track of it separately
+        var buffer_styles;
+        /**
+        merging takes a list of spans, joins all of the text together,
+        and only keeps the styles.
+    
+        We assume that all of the nodes have the same styles.
+        */
+        function flush() {
+            // normalize each of the collected nodes
+            buffer.forEach(function (childNode) { return childNode.normalize(); });
+            var merged_textContent = buffer.map(function (childNode) { return childNode.textContent; }).join('');
+            var merged_childNode = new XElement([new XText(merged_textContent)], buffer_styles);
+            normalized_childNodes.push(merged_childNode);
+            // reset the buffer variables
+            buffer = [];
+            buffer_styles = undefined;
+        }
+        this.childNodes.forEach(function (childNode) {
+            var containsOnlyText = childNode.containsOnlyText();
+            // only-whitespace always counts as the same style; it's like it has wildcard styles
+            if (childNode.isWhitespace()) {
+                buffer.push(childNode);
+            }
+            else if (buffer_styles === undefined && containsOnlyText) {
+                buffer.push(childNode);
+                buffer_styles = childNode.styles;
+            }
+            else if (childNode.styles === buffer_styles && containsOnlyText) {
+                buffer.push(childNode);
+            }
+            else {
+                flush();
+                buffer.push(childNode);
+                buffer_styles = childNode.styles;
+            }
+        });
+        // finish up with a final flush
+        flush();
+        this.childNodes = normalized_childNodes;
     };
     return XParagraph;
 })(XElement);
@@ -14252,8 +14315,8 @@ var XExample = (function (_super) {
     function XExample() {
         _super.apply(this, arguments);
     }
-    XExample.prototype.toVNode = function () {
-        var node = _super.prototype.toVNode.call(this);
+    XExample.prototype.toVChild = function () {
+        var node = _super.prototype.toVChild.call(this);
         node.properties['className'] += ' example';
         return node;
     };
@@ -14271,10 +14334,10 @@ var XReference = (function (_super) {
         _super.call(this, childNodes, styles);
         this.code = code;
     }
-    XReference.prototype.toVNode = function () {
+    XReference.prototype.toVChild = function () {
         var properties = this.getVProperties();
         properties['title'] = "code=" + this.code;
-        return virtual_dom_1.h('span.reference', properties, this.childNodes.map(function (childNode) { return childNode.toVNode(); }));
+        return virtual_dom_1.h('span.reference', properties, this.childNodes.map(function (childNode) { return childNode.toVChild(); }));
     };
     XReference.prototype.toLaTeX = function () {
         return t('Cref', this.code);
@@ -14303,8 +14366,8 @@ var XFootnote = (function (_super) {
     function XFootnote() {
         _super.apply(this, arguments);
     }
-    XFootnote.prototype.toVNode = function () {
-        return virtual_dom_1.h('span.footnote', this.getVProperties(), this.childNodes.map(function (childNode) { return childNode.toVNode(); }));
+    XFootnote.prototype.toVChild = function () {
+        return virtual_dom_1.h('span.footnote', this.getVProperties(), this.childNodes.map(function (childNode) { return childNode.toVChild(); }));
     };
     XFootnote.prototype.toLaTeX = function () {
         return t('footnote', _super.prototype.toLaTeX.call(this));
@@ -14317,8 +14380,8 @@ var XEndnote = (function (_super) {
     function XEndnote() {
         _super.apply(this, arguments);
     }
-    XEndnote.prototype.toVNode = function () {
-        return virtual_dom_1.h('span.endnote', this.getVProperties(), this.childNodes.map(function (childNode) { return childNode.toVNode(); }));
+    XEndnote.prototype.toVChild = function () {
+        return virtual_dom_1.h('span.endnote', this.getVProperties(), this.childNodes.map(function (childNode) { return childNode.toVChild(); }));
     };
     XEndnote.prototype.toLaTeX = function () {
         return t('endnote', _super.prototype.toLaTeX.call(this));
@@ -14334,164 +14397,193 @@ var JSZip = require('jszip');
 var docx = require('./formats/docx');
 var coders_1 = require('coders');
 var util_1 = require('./util');
-var Types = {};
-function raiseObject(obj) {
-    // Even if obj.__type__ is set, we can't assume that Types has such a key
-    var classObj = obj;
-    if (obj) {
-        var Type = Types[obj.__type__];
-        if (Type) {
-            if (Type.fromJSON) {
-                classObj = Type.fromJSON(obj);
+var StoredFile = (function () {
+    function StoredFile(name, size, type, lastModifiedDate, data_base64, data_arrayBuffer) {
+        this.name = name;
+        this.size = size;
+        this.type = type;
+        this.lastModifiedDate = lastModifiedDate;
+        this.data_base64 = data_base64;
+        this.data_arrayBuffer = data_arrayBuffer;
+    }
+    Object.defineProperty(StoredFile.prototype, "key", {
+        get: function () {
+            return "storedfile:" + this.name;
+        },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(StoredFile.prototype, "base64", {
+        /**
+        If neither `data_base64` nor `data_arrayBuffer` are available, this method
+        will fail.
+        */
+        get: function () {
+            if (this.data_base64 === undefined) {
+                var bytes = new Uint8Array(this.data_arrayBuffer);
+                this.data_base64 = coders_1.base64.encodeBytesToString(bytes);
             }
-            else {
-                // doesn't cut it and is recommended against on SO,
-                // despite Javascript being a Prototype-inheritance language:
-                // classObj.__proto__ = Type.prototype;
-                classObj = new Type(obj);
+            return this.data_base64;
+        },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(StoredFile.prototype, "arrayBuffer", {
+        /**
+        If neither `data_base64` nor `data_arrayBuffer` are available, this method
+        will fail.
+      
+        This cached getter allows us to load the file metadata for several stored
+        files without having to read the decode the base64 into ArrayBuffer until we
+        need it.
+        */
+        get: function () {
+            if (this.data_arrayBuffer === undefined) {
+                var bytes = coders_1.base64.decodeStringToBytes(this.data_base64);
+                this.data_arrayBuffer = new Uint8Array(bytes).buffer;
             }
-        }
-    }
-    return classObj;
-}
-function raiseJSON(obj) {
-    if (Array.isArray(obj)) {
-        return obj.map(raiseJSON);
-    }
-    else if (obj === Object(obj)) {
-        // mutable!
-        for (var key in obj) {
-            obj[key] = raiseJSON(obj[key]);
-        }
-        return raiseObject(obj);
-    }
-    return obj;
-}
-;
-// maybe look into using the `reviver` argument in JSON.parse(string, reviver)?
-// Reference: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/parse#Example.3A_Using_the_reviver_parameter
-// all I need is for ngStorage to use this method instead:
-angular.fromJson = function (json) {
-    var obj = angular.isString(json) ? JSON.parse(json) : json;
-    return raiseJSON(obj);
-};
-// ### app ###
+            return this.data_arrayBuffer;
+        },
+        enumerable: true,
+        configurable: true
+    });
+    /**
+    When stored as JSON, a StoredFile has its data encoded as a Base64 string,
+    under the key `data`.
+    */
+    StoredFile.fromJSON = function (object) {
+        return new StoredFile(object.name, object.size, object.type, object.lastModifiedDate, object.data);
+    };
+    StoredFile.prototype.toJSON = function () {
+        return {
+            name: this.name,
+            size: this.size,
+            type: this.type,
+            lastModifiedDate: this.lastModifiedDate,
+            data: this.base64,
+        };
+    };
+    return StoredFile;
+})();
 var app = angular.module('app', [
     'ui.router',
     'ngStorage',
     'misc-js/angular-plugins',
 ]);
+app.directive('uiSrefActiveAny', function ($state) {
+    return {
+        restrict: 'A',
+        scope: {
+            uiSrefActiveAny: '=',
+        },
+        link: function (scope, el) {
+            var activeClasses = scope['uiSrefActiveAny'];
+            function updateSrefActiveAny() {
+                for (var key in activeClasses) {
+                    var match = $state.includes(activeClasses[key]);
+                    el.toggleClass(key, match);
+                }
+            }
+            scope.$on('$stateChangeSuccess', updateSrefActiveAny);
+        }
+    };
+});
 app.config(function ($stateProvider, $urlRouterProvider) {
     $urlRouterProvider.otherwise(function ($injector, $location) {
         util_1.log('otherwise: coming from "%s"', $location.url());
-        return '/word';
+        return '/';
     });
     $stateProvider
-        .state('word', {
-        url: '/word',
-        templateUrl: 'templates/word.html',
-        controller: 'wordCtrl',
+        .state('documents', {
+        url: '/',
+        templateUrl: 'templates/documents.html',
+        controller: 'documentsCtrl',
     })
-        .state('word.file', {
-        url: '/files/:name',
-        templateUrl: 'templates/word_file.html',
-        controller: 'wordFileCtrl',
+        .state('document', {
+        url: '/:name',
+        templateUrl: 'templates/document.html',
+        controller: 'documentCtrl',
+        abstract: true,
     })
-        .state('xdoc', {
+        .state('document.files', {
+        url: '/files',
+        templateUrl: 'templates/files.html',
+    })
+        .state('document.files.xml', {
+        url: '/:filepath/xml',
+        templateUrl: 'templates/xml.html',
+        controller: 'documentFileXmlCtrl',
+    })
+        .state('document.xdoc', {
         url: '/xdoc',
         templateUrl: 'templates/xdoc.html',
-        controller: 'xdocCtrl',
+        controller: 'documentXDocCtrl',
     })
-        .state('latex', {
+        .state('document.latex', {
         url: '/latex',
         templateUrl: 'templates/latex.html',
-        controller: 'latexCtrl',
+        controller: 'documentLaTeXCtrl',
     });
 });
-function readFileAsDataURL(file, callback) {
-    var reader = new FileReader();
-    reader.onerror = function (err) { return callback(err); };
-    reader.onload = function (ev) { return callback(null, reader.result); };
-    reader.readAsDataURL(file);
-}
-function readFileAsArrayBuffer(file, callback) {
-    var reader = new FileReader();
-    reader.onerror = function (err) { return callback(err); };
-    reader.onload = function (ev) { return callback(null, reader.result); };
-    reader.readAsArrayBuffer(file);
-}
-;
-var LocalFile = (function () {
-    function LocalFile(name, size, type, lastModifiedDate, arraybuffer) {
-        if (arraybuffer === void 0) { arraybuffer = null; }
-        this.name = name;
-        this.size = size;
-        this.type = type;
-        this.lastModifiedDate = lastModifiedDate;
-        this.arraybuffer = arraybuffer;
-    }
-    LocalFile.fromJSON = function (obj) {
-        var base64_string = obj.data;
-        var bytes = coders_1.base64.decodeStringToBytes(base64_string);
-        var arraybuffer = new Uint8Array(bytes).buffer;
-        return new LocalFile(obj.name, obj.size, obj.type, obj.lastModifiedDate, arraybuffer);
-    };
-    LocalFile.prototype.toJSON = function () {
-        var bytes = new Uint8Array(this.arraybuffer);
-        return {
-            __type__: 'LocalFile',
-            name: this.name,
-            size: this.size,
-            type: this.type,
-            lastModifiedDate: this.lastModifiedDate,
-            data: coders_1.base64.encodeBytesToString(bytes),
-        };
-    };
-    return LocalFile;
-})();
-// angular-ext.js hack
-Types['LocalFile'] = LocalFile;
-app.controller('wordCtrl', function ($scope, $localStorage) {
-    $scope.$storage = $localStorage;
+app.controller('documentsCtrl', function ($scope, $flash) {
+    var storedFiles = Object.keys(localStorage)
+        .filter(function (key) { return key.match(/^storedfile:/) !== null; })
+        .map(function (key) { return StoredFile.fromJSON(JSON.parse(localStorage.getItem(key))); });
+    $scope.storedFiles = storedFiles;
+    /**
+    ng-onupload triggers this handler from the documents view/template.
+    */
     $scope.readFile = function (file) {
-        // sample file = {
-        //   lastModifiedDate: Tue Mar 04 2014 15:57:25 GMT-0600 (CST)
-        //   name: "asch-stims.xlsx"
-        //   size: 34307
-        //   type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        //   webkitRelativePath: ""
-        // }
-        $scope.$storage.file = new LocalFile(file.name, file.size, file.type, file.lastModifiedDate);
-        readFileAsArrayBuffer(file, function (err, arraybuffer) {
+        var reader = new FileReader();
+        reader.onerror = function (err) {
+            $scope.$apply(function () { throw err; });
+        };
+        reader.onload = function (ev) {
             $scope.$apply(function () {
-                if (err)
-                    throw err;
-                $scope.$storage.file.arraybuffer = arraybuffer;
+                var storedFile = new StoredFile(file.name, file.size, file.type, file.lastModifiedDate, undefined, reader.result);
+                localStorage.setItem(storedFile.key, JSON.stringify(storedFile));
+                $flash("Loaded file \"" + storedFile.name + "\" and saved in localStorage");
+                storedFiles.push(storedFile);
             });
-        });
+        };
+        reader.readAsArrayBuffer(file);
     };
-    $scope.$watch('$storage.file.arraybuffer', function (arraybuffer) {
-        if (arraybuffer && arraybuffer.byteLength > 0) {
-            $scope.zip = new JSZip(arraybuffer);
-        }
-    });
+    /**
+    the "remove" button triggers this handler from the documents view/template.
+    */
+    $scope.removeStoredFile = function (storedFile) {
+        localStorage.removeItem(storedFile.key);
+        var index = storedFiles.indexOf(storedFile);
+        storedFiles.splice(index, 1);
+    };
 });
-app.controller('wordFileCtrl', function ($scope, $state, $localStorage) {
-    $scope.$storage = $localStorage;
-    var zip = new JSZip($scope.$storage.file.arraybuffer);
-    var file = $scope.file = zip.file($state.params.name);
+app.controller('documentCtrl', function ($scope, $state) {
+    var storedFile = StoredFile.fromJSON(JSON.parse(localStorage.getItem("storedfile:" + $state.params.name)));
+    $scope.storedFile = storedFile;
+    // zip is only used in the document.files sub-state
+    $scope.zip = new JSZip(storedFile.arrayBuffer);
+});
+app.controller('documentFileXmlCtrl', function ($scope, $state) {
+    var storedFile = $scope.storedFile;
+    var zip = $scope.zip;
+    var file = $scope.file = zip.file($state.params.filepath);
     var text = $scope.text = file.asText();
 });
-app.controller('xdocCtrl', function ($scope, $localStorage) {
-    $scope.$storage = $localStorage;
-    var parser = new docx.Parser($scope.$storage.file.arraybuffer);
-    $scope.document = parser.document;
-});
-app.controller('latexCtrl', function ($scope, $localStorage) {
-    $scope.$storage = $localStorage;
-    $scope.timestamp = new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '');
-    var parser = new docx.Parser($scope.$storage.file.arraybuffer);
+app.controller('documentXDocCtrl', function ($scope, $localStorage) {
+    // $localStorage is only used for the preview configuration settings, like labels and outlines
+    $scope.$storage = $localStorage.$default({ labeled: true });
+    var storedFile = $scope.storedFile;
+    var parser = new docx.Parser(storedFile.arrayBuffer);
     var document = parser.document;
+    document.normalize();
+    $scope.document = document;
+});
+app.controller('documentLaTeXCtrl', function ($scope) {
+    $scope.timestamp = new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '');
+    var storedFile = $scope.storedFile;
+    var parser = new docx.Parser(storedFile.arrayBuffer);
+    var document = parser.document;
+    document.normalize();
     $scope.latex = document.toLaTeX();
 });
 app.directive('xdomDocument', function () {
@@ -14505,13 +14597,13 @@ app.directive('xdomDocument', function () {
             var vtree;
             function update(xDocument) {
                 if (vtree === undefined) {
-                    vtree = xDocument.toVNode();
+                    vtree = xDocument.toVChild();
                     element = virtual_dom_1.create(vtree);
                     // attach to the dom on the first draw
                     el[0].appendChild(element);
                 }
                 else {
-                    var new_vtree = xDocument.toVNode();
+                    var new_vtree = xDocument.toVChild();
                     var patches = virtual_dom_1.diff(vtree, new_vtree);
                     element = virtual_dom_1.patch(element, patches);
                     vtree = new_vtree;
