@@ -445,14 +445,6 @@ var adts = require('adts');
 var xdom = require('../xdom');
 var characters = require('../characters');
 var util_1 = require('../util');
-function eachChildElement(node, func) {
-    for (var i = 0, childNode; (childNode = node.childNodes[i]); i++) {
-        if (childNode.nodeType == Node.ELEMENT_NODE) {
-            var element = childNode;
-            func(element);
-        }
-    }
-}
 var ComplexField = (function (_super) {
     __extends(ComplexField, _super);
     /** `childNodes` is a container of the nodes between the "separate" and the "end" markers */
@@ -462,16 +454,11 @@ var ComplexField = (function (_super) {
         this.separated = false;
     }
     return ComplexField;
-})(xdom.XNode);
-var Bookmark = (function (_super) {
-    __extends(Bookmark, _super);
-    function Bookmark(id, name) {
-        _super.call(this);
-        this.id = id;
-        this.name = name;
-    }
-    return Bookmark;
-})(xdom.XNode);
+})(xdom.XElement);
+function childElements(node) {
+    var children = util_1.list(node.childNodes).filter(function (childNode) { return childNode.nodeType == Node.ELEMENT_NODE; });
+    return children;
+}
 /**
 parseXML takes an XML string and returns a DOM Level 2/3 Document:
 https://developer.mozilla.org/en-US/docs/Web/API/document
@@ -498,7 +485,7 @@ Returns a number representing a bitstring of xdom.Style flags.
 function readPropertiesStyles(properties) {
     var styles = 0;
     // everything we care about will an immediate child of the rPr or pPr
-    eachChildElement(properties, function (child) {
+    childElements(properties).forEach(function (child) {
         var tag = dropNS(child.tagName);
         var val = child.getAttribute('w:val');
         // italics (and bold, but with w:b) can be
@@ -539,12 +526,10 @@ body will most often be a <w:body> element, but may also be a
 The returned node's .childNodes will be xdom.XParagraph objects.
 */
 function readBody(body, context, parser) {
-    var container = new xdom.XNode();
-    eachChildElement(body, function (paragraph_element) {
-        var node = readParagraph(paragraph_element, context, parser);
-        container.appendChild(node);
-    });
-    return container;
+    var childNodes = util_1.list(body.childNodes)
+        .filter(function (childNode) { return childNode.nodeType == Node.ELEMENT_NODE; })
+        .map(function (element) { return readParagraph(element, context, parser); });
+    return new xdom.XElement(childNodes);
 }
 /**
 p should be a DOM Element <w:p> from the original Word document XML.
@@ -556,7 +541,7 @@ function readParagraph(paragraph_element, context, parser) {
     var paragraph = new xdom.XParagraph();
     context.stylesStack.push(0);
     // we need to read w:p's children in a loop, because each w:p's is not a constituent
-    eachChildElement(paragraph_element, function (child) {
+    childElements(paragraph_element).forEach(function (child) {
         var tag = dropNS(child.tagName);
         if (tag == 'pPr') {
             context.stylesStack.top = readPropertiesStyles(child);
@@ -564,7 +549,7 @@ function readParagraph(paragraph_element, context, parser) {
             if (pStyle) {
                 var pStyle_val = pStyle.getAttribute('w:val');
                 if (pStyle_val == 'ListNumber') {
-                    paragraph = new xdom.XExample(paragraph.childNodes, paragraph.textContent, paragraph.styles);
+                    paragraph = new xdom.XExample(paragraph.childNodes, paragraph.styles);
                 }
                 else {
                     util_1.log('ignoring pPr > pStyle', pStyle_val);
@@ -581,11 +566,6 @@ function readParagraph(paragraph_element, context, parser) {
             }
             else {
                 paragraph.appendChildren(nodes);
-                // bookmarks are not exclusive -- they are merely onlookers
-                // TODO: should this capture complex field elements too?
-                if (context.bookmarkStack.top) {
-                    context.bookmarkStack.top.appendChildren(nodes);
-                }
             }
         }
         else if (tag == 'hyperlink') {
@@ -593,7 +573,7 @@ function readParagraph(paragraph_element, context, parser) {
             // you can use the w:hyperlink[@r:id] value and _rels/document.xml.rels to resolve it,
             // but for now I just read the raw link
             // context.pushStyles(['hyperlink']);
-            eachChildElement(child, function (hyperlink_child) {
+            childElements(child).forEach(function (hyperlink_child) {
                 readRun(hyperlink_child, context, parser).forEach(function (node) { return paragraph.appendChild(node); });
             });
         }
@@ -609,16 +589,18 @@ function readParagraph(paragraph_element, context, parser) {
             </w:r>
             <w:bookmarkEnd w:id="0"></w:bookmarkEnd>
             */
-            context.bookmarkStack.push(new Bookmark(child.getAttribute('w:id'), child.getAttribute('w:name')));
+            var id = child.getAttribute('w:id');
+            var name = child.getAttribute('w:name');
+            // for now, I'm just going to assume that labels apply only to the
+            // paragraph in which they start, and that they apply to the whole paragraph
+            // (this is kind of a hack)
+            util_1.log('reading bookmark', id, name);
+            if (paragraph instanceof xdom.XExample) {
+                var code = name.replace(/[^A-Z0-9-]/gi, '');
+                paragraph.labels.push(code);
+            }
         }
         else if (tag == 'bookmarkEnd') {
-            // hopefully bookmarks aren't cross-nested
-            var bookmark = context.bookmarkStack.pop();
-            parser.bookmarks[bookmark.name] = bookmark;
-            // this is kind of a hack
-            if (paragraph instanceof xdom.XExample) {
-                paragraph.label = bookmark.name;
-            }
         }
         else {
             util_1.log('p > %s ignored', tag);
@@ -638,7 +620,7 @@ function readRun(run, context, parser) {
     // an <w:r> will generally contain only one interesting element besides rPr,
     //   e.g., text, footnote reference, endnote reference, or a symbol
     //   but we still iterate through them all; more elegant than multiple find()'s
-    eachChildElement(run, function (child) {
+    childElements(run).forEach(function (child) {
         var tag = dropNS(child.tagName);
         if (tag == 'rPr') {
             // presumably, the rPr will occur before anything else (it does in all the docx xml I've come across)
@@ -670,20 +652,19 @@ function readRun(run, context, parser) {
             }
             else {
                 util_1.log('r > sym: %s', shifted_char_code, font);
+                // logger.critical('Could not find symbol in map: %r' % char)
+                // replacement = u'MISSING SYMBOL (%r)' % char
                 text = shifted_char_code; // symbol_map.get(sym_char)
             }
-            // if replacement is None:
-            //     logger.critical('Could not find symbol in map: %r' % char)
-            //     replacement = u'MISSING SYMBOL (%r)' % char
-            var sym_node = new xdom.XNode([], text, context.currentStyles());
+            var sym_node = new xdom.XElement([new xdom.XText(text)], context.currentStyles());
             nodes.push(sym_node);
         }
         else if (tag == 't') {
-            var t_node = new xdom.XNode([], child.textContent, context.currentStyles());
+            var t_node = new xdom.XElement([new xdom.XText(child.textContent)], context.currentStyles());
             nodes.push(t_node);
         }
         else if (tag == 'tab') {
-            var tab_node = new xdom.XNode([], '\t', context.currentStyles());
+            var tab_node = new xdom.XElement([new xdom.XText('\t')], context.currentStyles());
             nodes.push(tab_node);
         }
         else if (tag == 'instrText') {
@@ -730,10 +711,17 @@ function readRun(run, context, parser) {
             else if (field_signal == 'end') {
                 // log('r > fldChar: fldCharType=end');
                 var complexField = context.complexFieldStack.pop();
-                var field_node = new xdom.XReference(complexField.code, complexField.childNodes, null, context.currentStyles());
-                // log('resolving fldChar REF code: "%s"', complexField.code);
-                // log('field_node', field_node, 'bookmark', bookmark);
-                nodes.push(field_node);
+                if (complexField) {
+                    var field_node = new xdom.XElement(complexField.childNodes, context.currentStyles());
+                    if (complexField.code) {
+                        var code = complexField.code.replace(/[^A-Z0-9-]/gi, '');
+                        field_node = new xdom.XReference(code, complexField.childNodes, context.currentStyles());
+                    }
+                    nodes.push(field_node);
+                }
+                else {
+                    util_1.log("Empty complexField encountered at:", child);
+                }
             }
             else {
                 throw new Error("r > fldChar: Unrecognized fldCharType: " + field_signal);
@@ -750,8 +738,7 @@ function readRun(run, context, parser) {
         else if (tag == 'lastRenderedPageBreak') {
         }
         else if (tag == 'br') {
-            // TODO: should this be a line break of some sort?
-            var break_node = new xdom.XNode([], '\n', context.currentStyles());
+            var break_node = new xdom.XElement([new xdom.XText('\n')], context.currentStyles());
             nodes.push(break_node);
         }
         else {
@@ -765,7 +752,6 @@ var Context = (function () {
     function Context() {
         this.complexFieldStack = new adts.Stack();
         this.stylesStack = new adts.Stack();
-        this.bookmarkStack = new adts.Stack();
     }
     /** Combines all styles in the stack */
     Context.prototype.currentStyles = function () {
@@ -777,24 +763,20 @@ var Parser = (function () {
     function Parser(arraybuffer, zip) {
         if (zip === void 0) { zip = new JSZip(arraybuffer); }
         this.zip = zip;
-        /** bookmarks are indexed by their name, not their id */
-        this.bookmarks = {};
     }
     Object.defineProperty(Parser.prototype, "document", {
         get: function () {
             var _this = this;
-            var doc = new xdom.XDocument(this.metadata);
             // the root element of the word/document.xml document is a w:document, which
             // should have one child element, w:body, whose children are a bunch of
             // <w:p> elements (paragraphs)
             var file = this.zip.file('word/document.xml');
             var documentBody = parseXML(file.asText()).documentElement.firstElementChild;
-            eachChildElement(documentBody, function (childNode) {
+            var children = childElements(documentBody).map(function (child) {
                 var context = new Context();
-                var paragraph_node = readParagraph(childNode, context, _this);
-                doc.appendChild(paragraph_node);
+                return readParagraph(child, context, _this);
             });
-            return doc;
+            return new xdom.XDocument(this.metadata, children);
         },
         enumerable: true,
         configurable: true
@@ -813,11 +795,11 @@ var Parser = (function () {
             // The footnotes.xml file may not exist.
             if (file) {
                 var document = parseXML(file.asText());
-                eachChildElement(document.documentElement, function (note) {
-                    var id = note.getAttribute('w:id');
+                childElements(document.documentElement).forEach(function (child) {
+                    var id = child.getAttribute('w:id');
                     // each w:footnote has a bunch of w:p children, like a w:body
                     var context = new Context();
-                    var container = readBody(note, context, _this);
+                    var container = readBody(child, context, _this);
                     footnotes[id] = new xdom.XFootnote(container.childNodes);
                 });
             }
@@ -837,10 +819,10 @@ var Parser = (function () {
             // The endnotes.xml file may not exist.
             if (file) {
                 var document = parseXML(file.asText());
-                eachChildElement(document.documentElement, function (note) {
-                    var id = note.getAttribute('w:id');
+                childElements(document.documentElement).forEach(function (child) {
+                    var id = child.getAttribute('w:id');
                     var context = new Context();
-                    var container = readBody(note, context, _this);
+                    var container = readBody(child, context, _this);
                     endnotes[id] = new xdom.XFootnote(container.childNodes);
                 });
             }
@@ -865,7 +847,7 @@ var Parser = (function () {
             // In case the file does not exist:
             if (file) {
                 var document = parseXML(file.asText());
-                eachChildElement(document.documentElement, function (child) {
+                childElements(document.documentElement).forEach(function (child) {
                     var tag = dropNS(child.tagName);
                     metadata[tag] = child.textContent;
                 });
@@ -897,7 +879,7 @@ var Parser = (function () {
             // In case the file does not exist:
             if (file) {
                 var document = parseXML(file.asText());
-                eachChildElement(document.documentElement, function (child) {
+                childElements(document.documentElement).forEach(function (child) {
                     var id = child.getAttribute('Id');
                     relationships[id] = child.getAttribute('Target');
                 });
@@ -14012,6 +13994,20 @@ function escapeRegExp(raw) {
 }
 exports.escapeRegExp = escapeRegExp;
 ;
+/**
+Take anything that can be indexed by number and returns a new copied Array of
+elements of that type.
+
+Useful for things like NodeLists.
+*/
+function list(array) {
+    var result = [];
+    for (var i = 0, item; (item = array[i]) !== undefined; i++) {
+        result.push(item);
+    }
+    return result;
+}
+exports.list = list;
 // pushAll, flatten, and flatMap come from pdfi/Arrays
 function pushAll(array, items) {
     return Array.prototype.push.apply(array, items);
@@ -14052,6 +14048,7 @@ var __extends = this.__extends || function (d, b) {
 };
 var virtual_dom_1 = require('virtual-dom');
 var latex_1 = require('./latex');
+var util_1 = require('./util');
 // We can do bitwise math in Javascript up to 2^29, so we can have up to
 // 29 styles
 // 2 << 29 ==  1073741824 == 2^30
@@ -14068,7 +14065,6 @@ function t(command, content) {
     return "\\" + command + "{" + content + "}";
 }
 function stringToLaTeX(raw) {
-    // log('Escaping: "%s"', string.encode('utf8'))
     return raw.replace(latex_1.replacementRegExp, function (match) { return latex_1.replacements[match]; });
 }
 /**
@@ -14076,21 +14072,48 @@ A fragment of a Document model; can be either a container,
 or, when extended, a node with some semantic role in a document.
 */
 var XNode = (function () {
-    function XNode(childNodes, textContent, styles) {
+    function XNode() {
+    }
+    XNode.prototype.toVNode = function () {
+        return virtual_dom_1.h('span', '');
+    };
+    XNode.prototype.toLaTeX = function () {
+        return '';
+    };
+    return XNode;
+})();
+exports.XNode = XNode;
+var XText = (function (_super) {
+    __extends(XText, _super);
+    function XText(data) {
+        _super.call(this);
+        this.data = data;
+    }
+    XText.prototype.toVNode = function () {
+        return virtual_dom_1.h('span', this.data);
+    };
+    XText.prototype.toLaTeX = function () {
+        return stringToLaTeX(this.data);
+    };
+    return XText;
+})(XNode);
+exports.XText = XText;
+var XElement = (function (_super) {
+    __extends(XElement, _super);
+    function XElement(childNodes, styles) {
         if (childNodes === void 0) { childNodes = []; }
-        if (textContent === void 0) { textContent = null; }
         if (styles === void 0) { styles = 0; }
+        _super.call(this);
         this.childNodes = childNodes;
-        this.textContent = textContent;
         this.styles = styles;
     }
-    XNode.prototype.appendChild = function (newChild) {
+    XElement.prototype.appendChild = function (newChild) {
         this.childNodes.push(newChild);
     };
-    XNode.prototype.appendChildren = function (newChildren) {
-        Array.prototype.push.apply(this.childNodes, newChildren);
+    XElement.prototype.appendChildren = function (newChildren) {
+        util_1.pushAll(this.childNodes, newChildren);
     };
-    XNode.prototype.getProperties = function () {
+    XElement.prototype.getVProperties = function () {
         // could be CSSStyleDeclaration but all the properties are required
         var style = {};
         if (this.styles & Style.Italic) {
@@ -14115,14 +14138,11 @@ var XNode = (function () {
         var title = undefined; // this.styles.toJSON().join('; ') ||
         return { style: style, title: title };
     };
-    XNode.prototype.getContent = function () {
-        return this.textContent ? this.textContent : this.childNodes.map(function (childNode) { return childNode.toVNode(); });
+    XElement.prototype.toVNode = function () {
+        return virtual_dom_1.h('span', this.getVProperties(), this.childNodes.map(function (childNode) { return childNode.toVNode(); }));
     };
-    XNode.prototype.toVNode = function () {
-        return virtual_dom_1.h('span', this.getProperties(), this.getContent());
-    };
-    XNode.prototype.toLaTeX = function () {
-        var content = this.textContent ? stringToLaTeX(this.textContent) : this.childNodes.map(function (childNode) { return childNode.toLaTeX(); }).join('');
+    XElement.prototype.toLaTeX = function () {
+        var content = this.childNodes.map(function (childNode) { return childNode.toLaTeX(); }).join('');
         if (this.styles & Style.Italic) {
             content = t('textit', content);
         }
@@ -14156,7 +14176,7 @@ var XNode = (function () {
   
      TODO: fix implementation
     */
-    XNode.prototype.normalize = function () {
+    XElement.prototype.normalize = function () {
         throw new Error('Not yet implemented');
         // inner_spans and outer_spans are temporary lists of spans
         // var inner_spans = [];
@@ -14203,23 +14223,29 @@ var XNode = (function () {
         //   return new WordSpan(text, first.styles, first.attrs);
         // };
     };
-    return XNode;
-})();
-exports.XNode = XNode;
+    return XElement;
+})(XNode);
+exports.XElement = XElement;
+/**
+Output is similar to XNode's, but returns an actual HTML DOM element,
+a div.paragraph, rather than a document fragment
+*/
 var XParagraph = (function (_super) {
     __extends(XParagraph, _super);
     function XParagraph() {
         _super.apply(this, arguments);
+        this.labels = [];
     }
-    /**
-    Output is similar to XNode's, but returns an actual HTML DOM element,
-    a div.paragraph, rather than a document fragment
-    */
     XParagraph.prototype.toVNode = function () {
-        return virtual_dom_1.h('div.paragraph', this.getProperties(), this.getContent());
+        var properties = this.getVProperties();
+        properties['title'] = "labels=" + this.labels.join(',');
+        return virtual_dom_1.h('div.paragraph', properties, this.childNodes.map(function (childNode) { return childNode.toVNode(); }));
+    };
+    XParagraph.prototype.toLaTeX = function () {
+        return '\n' + _super.prototype.toLaTeX.call(this) + this.labels.map(function (label) { return t('label', label); }).join('') + '\n';
     };
     return XParagraph;
-})(XNode);
+})(XElement);
 exports.XParagraph = XParagraph;
 var XExample = (function (_super) {
     __extends(XExample, _super);
@@ -14227,39 +14253,44 @@ var XExample = (function (_super) {
         _super.apply(this, arguments);
     }
     XExample.prototype.toVNode = function () {
-        var properties = this.getProperties();
-        properties['title'] = "label=" + this.label;
-        return virtual_dom_1.h('div.paragraph.example', properties, this.getContent());
+        var node = _super.prototype.toVNode.call(this);
+        node.properties['className'] += ' example';
+        return node;
+    };
+    XExample.prototype.toLaTeX = function () {
+        return '\n' + t("example", _super.prototype.toLaTeX.call(this).trim()) + '\n';
     };
     return XExample;
 })(XParagraph);
 exports.XExample = XExample;
 var XReference = (function (_super) {
     __extends(XReference, _super);
-    function XReference(code, childNodes, textContent, styles) {
+    function XReference(code, childNodes, styles) {
         if (childNodes === void 0) { childNodes = []; }
-        if (textContent === void 0) { textContent = null; }
         if (styles === void 0) { styles = 0; }
-        _super.call(this, childNodes, textContent, styles);
+        _super.call(this, childNodes, styles);
         this.code = code;
     }
     XReference.prototype.toVNode = function () {
-        // var bookmark = parser.bookmarks[complexField.code]
-        var properties = this.getProperties();
+        var properties = this.getVProperties();
         properties['title'] = "code=" + this.code;
-        return virtual_dom_1.h('span.reference', properties, this.getContent());
+        return virtual_dom_1.h('span.reference', properties, this.childNodes.map(function (childNode) { return childNode.toVNode(); }));
+    };
+    XReference.prototype.toLaTeX = function () {
+        return t('Cref', this.code);
     };
     return XReference;
-})(XNode);
+})(XElement);
 exports.XReference = XReference;
 var XDocument = (function (_super) {
     __extends(XDocument, _super);
-    function XDocument(metadata) {
-        _super.call(this);
+    function XDocument(metadata, childNodes) {
+        if (childNodes === void 0) { childNodes = []; }
+        _super.call(this, childNodes);
         this.metadata = metadata;
     }
     return XDocument;
-})(XNode);
+})(XElement);
 exports.XDocument = XDocument;
 /**
 XSpan is the basic text block of a document, associated with a single
@@ -14273,10 +14304,13 @@ var XFootnote = (function (_super) {
         _super.apply(this, arguments);
     }
     XFootnote.prototype.toVNode = function () {
-        return virtual_dom_1.h('span.footnote', this.getProperties(), this.getContent());
+        return virtual_dom_1.h('span.footnote', this.getVProperties(), this.childNodes.map(function (childNode) { return childNode.toVNode(); }));
+    };
+    XFootnote.prototype.toLaTeX = function () {
+        return t('footnote', _super.prototype.toLaTeX.call(this));
     };
     return XFootnote;
-})(XNode);
+})(XElement);
 exports.XFootnote = XFootnote;
 var XEndnote = (function (_super) {
     __extends(XEndnote, _super);
@@ -14284,13 +14318,16 @@ var XEndnote = (function (_super) {
         _super.apply(this, arguments);
     }
     XEndnote.prototype.toVNode = function () {
-        return virtual_dom_1.h('span.endnote', this.getProperties(), this.getContent());
+        return virtual_dom_1.h('span.endnote', this.getVProperties(), this.childNodes.map(function (childNode) { return childNode.toVNode(); }));
+    };
+    XEndnote.prototype.toLaTeX = function () {
+        return t('endnote', _super.prototype.toLaTeX.call(this));
     };
     return XEndnote;
-})(XNode);
+})(XElement);
 exports.XEndnote = XEndnote;
 
-},{"./latex":3,"virtual-dom":53}],86:[function(require,module,exports){
+},{"./latex":3,"./util":84,"virtual-dom":53}],86:[function(require,module,exports){
 /// <reference path="type_declarations/index.d.ts" />
 var virtual_dom_1 = require('virtual-dom');
 var JSZip = require('jszip');
@@ -14488,13 +14525,6 @@ app.directive('xdomDocument', function () {
         }
     };
 });
-function list(array) {
-    var result = [];
-    for (var i = 0, item; (item = array[i]); i++) {
-        result.push(item);
-    }
-    return result;
-}
 var XMLRenderer = (function () {
     function XMLRenderer(blacklist) {
         if (blacklist === void 0) { blacklist = []; }
@@ -14502,13 +14532,13 @@ var XMLRenderer = (function () {
     }
     XMLRenderer.prototype.renderAttributes = function (attributes) {
         var _this = this;
-        return list(attributes).filter(function (attr) {
+        return util_1.list(attributes).filter(function (attr) {
             return _this.blacklist.indexOf(attr.name) == -1;
         }).map(function (attr) { return virtual_dom_1.h('span.attribute', [' ', virtual_dom_1.h('span.name', attr.name), '=', virtual_dom_1.h('span.value', "\"" + attr.value + "\"")]); });
     };
     XMLRenderer.prototype.renderXmlNodes = function (nodes) {
         var _this = this;
-        return list(nodes).filter(function (node) {
+        return util_1.list(nodes).filter(function (node) {
             // return false for element nodes which have a blacklisted tag name
             return (node.nodeType != Node.ELEMENT_NODE) || _this.blacklist.indexOf(node.tagName) == -1;
         }).map(function (node) { return _this.renderXmlNode(node); });
