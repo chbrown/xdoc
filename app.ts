@@ -7,53 +7,70 @@ import {base64} from 'coders';
 import {log, flatten, list} from './util';
 import xdom = require('./xdom');
 
-var Types = {};
-
-function raiseObject(obj) {
-  // Even if obj.__type__ is set, we can't assume that Types has such a key
-  var classObj = obj;
-  if (obj) {
-    var Type: any = Types[obj.__type__];
-    if (Type) {
-      if (Type.fromJSON) {
-        classObj = Type.fromJSON(obj);
-      }
-      else {
-        // doesn't cut it and is recommended against on SO,
-        // despite Javascript being a Prototype-inheritance language:
-        // classObj.__proto__ = Type.prototype;
-        classObj = new Type(obj);
-        // _.extend(classObj, obj);
-      }
-    }
-  }
-  return classObj;
+interface StoredFileJSON {
+  name: string;
+  size: number;
+  type: string;
+  lastModifiedDate: any;
+  data: string;
 }
 
-function raiseJSON(obj) {
-  if (Array.isArray(obj)) {
-    return obj.map(raiseJSON);
+class StoredFile {
+  constructor(public name: string,
+              public size: number,
+              public type: string,
+              public lastModifiedDate: any,
+              private data_base64?: string,
+              private data_arrayBuffer?: ArrayBuffer) { }
+
+  get key(): string {
+    return `storedfile:${this.name}`;
   }
-  else if (obj === Object(obj)) { // that's how _ does it!
-    // mutable!
-    for (var key in obj) {
-      obj[key] = raiseJSON(obj[key]);
+
+  /**
+  If neither `data_base64` nor `data_arrayBuffer` are available, this method
+  will fail.
+  */
+  get base64(): string {
+    if (this.data_base64 === undefined) {
+      var bytes = new Uint8Array(this.data_arrayBuffer);
+      this.data_base64 = base64.encodeBytesToString(bytes);
     }
-    return raiseObject(obj);
+    return this.data_base64;
   }
-  return obj;
-};
+  /**
+  If neither `data_base64` nor `data_arrayBuffer` are available, this method
+  will fail.
 
-// maybe look into using the `reviver` argument in JSON.parse(string, reviver)?
-// Reference: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/parse#Example.3A_Using_the_reviver_parameter
+  This cached getter allows us to load the file metadata for several stored
+  files without having to read the decode the base64 into ArrayBuffer until we
+  need it.
+  */
+  get arrayBuffer(): ArrayBuffer {
+    if (this.data_arrayBuffer === undefined) {
+      var bytes = base64.decodeStringToBytes(this.data_base64);
+      this.data_arrayBuffer = new Uint8Array(bytes).buffer;
+    }
+    return this.data_arrayBuffer;
+  }
 
-// all I need is for ngStorage to use this method instead:
-angular.fromJson = json => {
-  var obj = angular.isString(json) ? JSON.parse(json) : json;
-  return raiseJSON(obj);
+  /**
+  When stored as JSON, a StoredFile has its data encoded as a Base64 string,
+  under the key `data`.
+  */
+  static fromJSON(object: StoredFileJSON): StoredFile {
+    return new StoredFile(object.name, object.size, object.type, object.lastModifiedDate, object.data);
+  }
+  toJSON(): StoredFileJSON {
+    return {
+      name: this.name,
+      size: this.size,
+      type: this.type,
+      lastModifiedDate: this.lastModifiedDate,
+      data: this.base64,
+    };
+  }
 }
-
-// ### app ###
 
 var app = angular.module('app', [
   'ui.router',
@@ -61,133 +78,137 @@ var app = angular.module('app', [
   'misc-js/angular-plugins',
 ]);
 
+app.directive('uiSrefActiveAny', function($state) {
+  return {
+    restrict: 'A',
+    scope: {
+      uiSrefActiveAny: '=',
+    },
+    link: function(scope, el) {
+      var activeClasses = scope.uiSrefActiveAny;
+      function updateSrefActiveAny() {
+        for (var key in activeClasses) {
+          var match = $state.includes(activeClasses[key]);
+          el.toggleClass(key, match);
+        }
+      }
+      scope.$on('$stateChangeSuccess', updateSrefActiveAny);
+    }
+  };
+});
+
 app.config(($stateProvider, $urlRouterProvider) => {
   $urlRouterProvider.otherwise(($injector, $location) => {
     log('otherwise: coming from "%s"', $location.url());
-    return '/word';
+    return '/';
   });
 
   $stateProvider
-  .state('word', {
-    url: '/word',
-    templateUrl: 'templates/word.html',
-    controller: 'wordCtrl',
+  .state('documents', {
+    url: '/',
+    templateUrl: 'templates/documents.html',
+    controller: 'documentsCtrl',
   })
-  .state('word.file', {
-    url: '/files/:name',
-    templateUrl: 'templates/word_file.html',
-    controller: 'wordFileCtrl',
+  .state('document', {
+    url: '/:name',
+    templateUrl: 'templates/document.html',
+    controller: 'documentCtrl',
+    abstract: true,
   })
-  .state('xdoc', {
+  .state('document.files', {
+    url: '/files',
+    templateUrl: 'templates/files.html',
+  })
+  .state('document.files.xml', {
+    url: '/:filepath/xml',
+    templateUrl: 'templates/xml.html',
+    controller: 'documentFileXmlCtrl',
+  })
+  .state('document.xdoc', {
     url: '/xdoc',
     templateUrl: 'templates/xdoc.html',
-    controller: 'xdocCtrl',
+    controller: 'documentXDocCtrl',
   })
   // .state('validate', {
   //   url: '/validate',
   //   templateUrl: 'templates/validate.html',
   // });
-  .state('latex', {
+  .state('document.latex', {
     url: '/latex',
     templateUrl: 'templates/latex.html',
-    controller: 'latexCtrl',
+    controller: 'documentLaTeXCtrl',
   });
 });
 
-function readFileAsDataURL(file: File, callback) {
-  var reader = new FileReader();
-  reader.onerror = err => callback(err);
-  reader.onload = ev => callback(null, reader.result);
-  reader.readAsDataURL(file);
-}
+app.controller('documentsCtrl', ($scope, $flash) => {
+  var storedFiles: StoredFile[] = Object.keys(localStorage)
+    .filter(key => key.match(/^storedfile:/) !== null)
+    .map(key => StoredFile.fromJSON(JSON.parse(localStorage.getItem(key))));
 
-function readFileAsArrayBuffer(file: File, callback) {
-  var reader = new FileReader();
-  reader.onerror = err => callback(err);
-  reader.onload = ev => callback(null, reader.result);
-  reader.readAsArrayBuffer(file);
-};
+  $scope.storedFiles = storedFiles;
 
-class LocalFile {
-  constructor(public name: string,
-              public size: number,
-              public type: string,
-              public lastModifiedDate: string,
-              public arraybuffer: ArrayBuffer = null) { }
-
-  static fromJSON(obj: any): LocalFile {
-    var base64_string: string = obj.data;
-    var bytes = base64.decodeStringToBytes(base64_string);
-    var arraybuffer = new Uint8Array(bytes).buffer;
-    return new LocalFile(obj.name, obj.size, obj.type, obj.lastModifiedDate, arraybuffer);
-  }
-  toJSON() {
-    var bytes = new Uint8Array(this.arraybuffer);
-    return {
-      __type__: 'LocalFile',
-      name: this.name,
-      size: this.size,
-      type: this.type,
-      lastModifiedDate: this.lastModifiedDate,
-      data: base64.encodeBytesToString(bytes),
-    };
-  }
-}
-
-// angular-ext.js hack
-Types['LocalFile'] = LocalFile;
-
-app.controller('wordCtrl', ($scope, $localStorage) => {
-  $scope.$storage = $localStorage;
-
+  /**
+  ng-onupload triggers this handler from the documents view/template.
+  */
   $scope.readFile = (file: File) => {
-    // sample file = {
-    //   lastModifiedDate: Tue Mar 04 2014 15:57:25 GMT-0600 (CST)
-    //   name: "asch-stims.xlsx"
-    //   size: 34307
-    //   type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    //   webkitRelativePath: ""
-    // }
-    $scope.$storage.file = new LocalFile(file.name, file.size, file.type, file.lastModifiedDate);
-
-    readFileAsArrayBuffer(file, (err, arraybuffer) => {
-      $scope.$apply(function() {
-        if (err) throw err;
-        $scope.$storage.file.arraybuffer = arraybuffer;
+    var reader = new FileReader();
+    reader.onerror = err => {
+      $scope.$apply(() => { throw err; });
+    };
+    reader.onload = ev => {
+      $scope.$apply(() => {
+        var storedFile = new StoredFile(file.name, file.size, file.type, file.lastModifiedDate, undefined, reader.result);
+        localStorage.setItem(storedFile.key, JSON.stringify(storedFile));
+        $flash(`Loaded file "${storedFile.name}" and saved in localStorage`);
+        storedFiles.push(storedFile);
       });
-    });
+    };
+    reader.readAsArrayBuffer(file);
   };
 
-  $scope.$watch('$storage.file.arraybuffer', (arraybuffer: ArrayBuffer) => {
-    if (arraybuffer && arraybuffer.byteLength > 0) {
-      $scope.zip = new JSZip(arraybuffer);
-    }
-  });
+  /**
+  the "remove" button triggers this handler from the documents view/template.
+  */
+  $scope.removeStoredFile = (storedFile: StoredFile) => {
+    localStorage.removeItem(storedFile.key);
+    var index = storedFiles.indexOf(storedFile);
+    storedFiles.splice(index, 1);
+  };
 });
 
-app.controller('wordFileCtrl', ($scope, $state, $localStorage) => {
-  $scope.$storage = $localStorage;
+app.controller('documentCtrl', ($scope, $state) => {
+  var storedFile: StoredFile = StoredFile.fromJSON(JSON.parse(localStorage.getItem(`storedfile:${$state.params.name}`)));
 
-  var zip = new JSZip($scope.$storage.file.arraybuffer);
-  var file = $scope.file = zip.file($state.params.name);
+  $scope.storedFile = storedFile;
+  // zip is only used in the document.files sub-state
+  $scope.zip = new JSZip(storedFile.arrayBuffer);
+});
+
+app.controller('documentFileXmlCtrl', ($scope, $state) => {
+  var storedFile: StoredFile = $scope.storedFile;
+  var zip: JSZip = $scope.zip;
+
+  var file = $scope.file = zip.file($state.params.filepath);
   var text = $scope.text = file.asText();
 });
 
-app.controller('xdocCtrl', ($scope, $localStorage) => {
-  $scope.$storage = $localStorage;
+app.controller('documentXDocCtrl', ($scope, $localStorage) => {
+  // $localStorage is only used for the preview configuration settings, like labels and outlines
+  $scope.$storage = $localStorage.$default({labeled: true});
 
-  var parser = new docx.Parser($scope.$storage.file.arraybuffer);
+  var storedFile: StoredFile = $scope.storedFile;
+
+  var parser = new docx.Parser(storedFile.arrayBuffer);
   $scope.document = parser.document;
 });
 
-app.controller('latexCtrl', ($scope, $localStorage) => {
-  $scope.$storage = $localStorage;
-
+app.controller('documentLaTeXCtrl', ($scope) => {
   $scope.timestamp = new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '');
 
-  var parser = new docx.Parser($scope.$storage.file.arraybuffer);
-  var document = parser.document;
-  $scope.latex = document.toLaTeX();
+  var storedFile: StoredFile = $scope.storedFile;
+
+  var parser = new docx.Parser(storedFile.arrayBuffer);
+  $scope.latex = parser.document.toLaTeX();
 });
 
 

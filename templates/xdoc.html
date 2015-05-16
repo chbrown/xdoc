@@ -1,5 +1,5 @@
 <section class="hpad">
-  <h3>Document metadata</h3>
+  <h2>Metadata</h2>
   <ul>
     <li ng-repeat="(key, value) in document.metadata">{{key}}: {{value}}</li>
   </ul>
@@ -8,8 +8,12 @@
 <section class="hpad">
   <h2>Document</h2>
 
-  <label><input type="checkbox" ng-model="$storage.labeled"> Show labels</label>
-  <label><input type="checkbox" ng-model="$storage.outlined"> Show outlines</label>
+  <div>
+    <label><input type="checkbox" ng-model="$storage.labeled"> Show labels, like "Footnote" and "Endnote"</label>
+  </div>
+  <div>
+    <label><input type="checkbox" ng-model="$storage.outlined"> Show outlines around each span</label>
+  </div>
 
   <div class="document" ng-class="{labeled: $storage.labeled, outlined: $storage.outlined}" xdom-document="document"></div>
 </section>

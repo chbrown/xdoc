@@ -6,19 +6,34 @@ div,input,main,nav,section,span,textarea{box-sizing:border-box}
 section{margin-top:5px;margin-bottom:5px;padding-top:5px;padding-bottom:5px}
 .vpad{padding-top:10px;padding-bottom:10px}
 .hpad{padding-left:10px;padding-right:10px}
+table.fill{width:100%}
+table.striped thead tr{background-color:#fff}
+table.striped tbody tr:nth-child(odd){background-color:#FCFCFC}
+table.striped tbody tr:nth-child(even){background-color:#FEFEFE}
+table.striped tfoot tr{background-color:#FAFAFA}
+table.lined tbody td{border-top:1px solid #EEE}
+table.padded tr td:first-child,table.padded tr th:first-child{padding-left:10px}
+table.padded tr td:last-child,table.padded tr th:last-child{padding-right:10px}
 body{background-color:#fff;font:14px "Lucida Grande",Arial,sans-serif}
 label[disabled]{color:#777}
 fieldset{margin:10px 10px;border:1px solid #CCC}
 .code,code{font-family:monospace}
 .help{font-size:80%;color:#444;cursor:pointer}
 table td,table th{padding:1px 4px 2px 2px;vertical-align:top}
-nav[fixedflow]{left:0;right:0;z-index:100;font-size:90%;background-color:#999;padding:0 5px;-webkit-user-select:none;-moz-user-select:none;user-select:none}
-nav[fixedflow] .tab{display:inline-block;padding:2px 6px;margin:3px 0 0 0;border-radius:2px 2px 0 0;background-color:#DDD}
+.number{text-align:right}
+.flash{position:fixed;left:0;right:0;text-align:center;pointer-events:none;z-index:10000}
+.flash span{display:inline-block;background-color:rgba(0,0,0,.75);color:#fff;padding:5px 8px;margin:3px 6px;border-radius:3px;white-space:pre-wrap;text-align:left;pointer-events:auto}
+nav{padding:0 5px;z-index:100;font-size:90%;-webkit-user-select:none;-moz-user-select:none;user-select:none}
+nav .tab,nav .text{display:inline-block;vertical-align:middle;padding:3px 6px;margin:3px 3px 0 3px}
+nav .tab{border-radius:2px 2px 0 0}
+nav[fixedflow]{left:0;right:0;background-color:#888}
+nav[fixedflow] .tab{background-color:#DDD}
 nav[fixedflow] .tab.current,nav[fixedflow] .tab:hover{background-color:#FDFDFD}
+nav.sub{background-color:#DDD}
+nav.sub .tab{background-color:#BBB}
+nav.sub .tab.current,nav.sub .tab:hover{background-color:#FDFDFD}
 .wrap{word-break:break-all;white-space:pre-wrap}
 .raw{white-space:pre-wrap}
-table.map td{border-bottom:1px solid rgba(0,0,0,.05)}
-table.map tr:last-child td{border-bottom:none}
 .document{padding:5px;font-family:"Times New Roman",Serif;background-color:#89A}
 .document .paragraph{min-height:1.2em;margin:5px 0;padding:2px;white-space:pre-wrap;background-color:#fff}
 .document .example{background-color:#f0f8ff;counter-increment:example}

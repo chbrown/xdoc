@@ -33,6 +33,38 @@ section {
   padding-right: 10px;
 }
 // -----------------------
+// --- generic tables ---
+table.fill {
+  width: 100%;
+}
+table.striped {
+  thead tr {
+    background-color: white;
+  }
+  tbody {
+    tr:nth-child(odd) {
+      background-color: #FCFCFC;
+    }
+    tr:nth-child(even) {
+      background-color: #FEFEFE;
+    }
+  }
+  tfoot tr {
+    background-color: #FAFAFA;
+  }
+}
+table.lined {
+  tbody td {
+    border-top: 1px solid #EEE;
+  }
+}
+table.padded {
+  tr td, tr th {
+    &:first-child { padding-left: 10px; }
+    &:last-child { padding-right: 10px; }
+  }
+}
+// ----------------------
 
 body {
   background-color: white;
@@ -59,14 +91,36 @@ table {
     vertical-align: top;
   }
 }
+.number {
+  text-align: right;
+}
 
-nav[fixedflow] {
+.flash {
+  position: fixed;
   left: 0;
   right: 0;
+  text-align: center;
+  pointer-events: none; // "none" allows click through to elements underneath
+
+  z-index: 10000;
+
+  span {
+    display: inline-block;
+    background-color: rgba(0, 0, 0, 75%);
+    color: white;
+    padding: 5px 8px;
+    margin: 3px 6px;
+    border-radius: 3px;
+    white-space: pre-wrap;
+    text-align: left;
+    pointer-events: auto; // allow selecting the text of the flash message
+  }
+}
+
+nav {
+  padding: 0 5px;
   z-index: 100;
   font-size: 90%;
-  background-color: #999;
-  padding: 0 5px;
 
   // prevent user-select so that we call super+a (select all) on the latex
   // page and not pick up the navigation tabs.
@@ -74,18 +128,42 @@ nav[fixedflow] {
   -moz-user-select: none;
   user-select: none;
 
-  .tab {
+  .tab, .text {
     display: inline-block;
-    padding: 2px 6px;
-    // padding: 1px 5px 2px;
-    margin: 3px 0 0 0;
+    vertical-align: middle;
+    padding: 3px 6px;
+    margin: 3px 3px 0 3px;
+  }
+  .tab {
     border-radius: 2px 2px 0 0;
-    // coloring:
+  }
+
+  &[fixedflow] {
+    left: 0;
+    right: 0;
+    background-color: #888;
+
+    .tab {
+      background-color: #DDD;
+      &:hover, &.current {
+        background-color: #FDFDFD;
+      }
+    }
+
+  }
+
+  &.sub {
     background-color: #DDD;
-    &:hover, &.current {
-      background-color: #FDFDFD;
+
+    .tab {
+      background-color: #BBB;
+      &:hover, &.current {
+        background-color: #FDFDFD;
+      }
     }
   }
+
+
 }
 
 /* https://developer.mozilla.org/en-US/docs/Web/CSS/word-break
@@ -107,18 +185,6 @@ nav[fixedflow] {
 */
 .raw {
   white-space: pre-wrap;
-}
-
-table.map {
-  td {
-    border-bottom: 1px solid rgba(0%, 0%, 0%, 5%);
-  }
-  tr:last-child td {
-    border-bottom: none;
-  }
-  td:last-child {
-    // word-break: break-all;
-  }
 }
 
 .document {
