@@ -3,7 +3,7 @@ import _ = require('lodash');
 import adts = require('adts');
 import {VNode, VProperties, h} from 'virtual-dom';
 import {replacements, replacementRegExp} from './latex';
-import {pushAll} from './util';
+import {log, pushAll} from './util';
 
 // We can do bitwise math in Javascript up to 2^29, so we can have up to
 // 29 styles
@@ -189,30 +189,31 @@ export class XElement extends XNode {
   }
 }
 
+/**
+Output is similar to XNode's, but returns an actual HTML DOM element,
+a div.paragraph, rather than a document fragment
+*/
 export class XParagraph extends XElement {
-  /**
-  Output is similar to XNode's, but returns an actual HTML DOM element,
-  a div.paragraph, rather than a document fragment
-  */
+  labels: string[] = [];
   toVNode(): VNode {
-    return h('div.paragraph', this.getVProperties(),
+    var properties = this.getVProperties();
+    properties['title'] = `labels=${this.labels.join(',')}`;
+    return h('div.paragraph', properties,
       this.childNodes.map(childNode => childNode.toVNode()));
   }
   toLaTeX(): string {
-    return '\n' + super.toLaTeX() + '\n';
+    return '\n' + super.toLaTeX() + this.labels.map(label => t('label', label)).join('') + '\n';
   }
 }
 
 export class XExample extends XParagraph {
-  label: string;
   toVNode(): VNode {
-    var properties = this.getVProperties();
-    properties['title'] = `label=${this.label}`;
-    return h('div.paragraph.example', properties,
-      this.childNodes.map(childNode => childNode.toVNode()));
+    var node = super.toVNode();
+    node.properties['className'] += ' example';
+    return node;
   }
   toLaTeX(): string {
-    return t(`example[${this.label}]`, super.toLaTeX());
+    return '\n' + t(`example`, super.toLaTeX().trim()) + '\n';
   }
 }
 
@@ -224,7 +225,6 @@ export class XReference extends XElement {
   }
 
   toVNode(): VNode {
-    // var bookmark = parser.bookmarks[complexField.code]
     var properties = this.getVProperties();
     properties['title'] = `code=${this.code}`;
     return h('span.reference', properties,

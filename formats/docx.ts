@@ -21,10 +21,6 @@ class ComplexField extends xdom.XElement {
   constructor() { super() }
 }
 
-class Bookmark extends xdom.XElement {
-  constructor(public id: string, public name: string) { super() }
-}
-
 function childElements(node: Node): Element[] {
   var children = list(node.childNodes).filter(childNode => childNode.nodeType == Node.ELEMENT_NODE);
   return <Element[]>children;
@@ -145,11 +141,6 @@ function readParagraph(paragraph_element: Element, context: Context, parser: Par
       }
       else {
         paragraph.appendChildren(nodes);
-        // bookmarks are not exclusive -- they are merely onlookers
-        // TODO: should this capture complex field elements too?
-        if (context.bookmarkStack.top) {
-          context.bookmarkStack.top.appendChildren(nodes);
-        }
       }
 
     }
@@ -178,18 +169,21 @@ function readParagraph(paragraph_element: Element, context: Context, parser: Par
       </w:r>
       <w:bookmarkEnd w:id="0"></w:bookmarkEnd>
       */
-      context.bookmarkStack.push(new Bookmark(child.getAttribute('w:id'), child.getAttribute('w:name')));
+      var id = child.getAttribute('w:id');
+      var name = child.getAttribute('w:name');
+
+      // for now, I'm just going to assume that labels apply only to the
+      // paragraph in which they start, and that they apply to the whole paragraph
+      // (this is kind of a hack)
+      log('reading bookmark', id, name);
+
+      if (paragraph instanceof xdom.XExample) {
+        var code = name.replace(/[^A-Z0-9-]/gi, '');
+        paragraph.labels.push(code);
+      }
     }
     else if (tag == 'bookmarkEnd') {
-      // hopefully bookmarks aren't cross-nested
-      var bookmark = context.bookmarkStack.pop();
-      parser.bookmarks[bookmark.name] = bookmark;
-
-      // this is kind of a hack
-      if (paragraph instanceof xdom.XExample) {
-        var code = bookmark.name.replace(/[^A-Z0-9-]/gi, '');
-        paragraph.label = code;
-      }
+      // hopefully bookmarks aren't cross-nested?
     }
     else {
       log('p > %s ignored', tag);
@@ -252,7 +246,6 @@ function readRun(run: Element, context: Context, parser: Parser): xdom.XNode[] {
         text = shifted_char_code; // symbol_map.get(sym_char)
       }
 
-
       var sym_node = new xdom.XElement([new xdom.XText(text)], context.currentStyles());
       nodes.push(sym_node);
     }
@@ -313,14 +306,17 @@ function readRun(run: Element, context: Context, parser: Parser): xdom.XNode[] {
       else if (field_signal == 'end') {
         // log('r > fldChar: fldCharType=end');
         var complexField = context.complexFieldStack.pop();
-
-        var code = complexField.code.replace(/[^A-Z0-9-]/gi, '');
-        var field_node = new xdom.XReference(code, complexField.childNodes, context.currentStyles());
-
-        // log('resolving fldChar REF code: "%s"', complexField.code);
-        // log('field_node', field_node, 'bookmark', bookmark);
-
-        nodes.push(field_node);
+        if (complexField) {
+          var field_node = new xdom.XElement(complexField.childNodes, context.currentStyles());
+          if (complexField.code) {
+            var code = complexField.code.replace(/[^A-Z0-9-]/gi, '');
+            field_node = new xdom.XReference(code, complexField.childNodes, context.currentStyles());
+          }
+          nodes.push(field_node);
+        }
+        else {
+          log(`Empty complexField encountered at:`, child);
+        }
         // var change = child.find('{*}numberingChange');
         // var span;
         // if (change) {
@@ -366,7 +362,6 @@ function readRun(run: Element, context: Context, parser: Parser): xdom.XNode[] {
 class Context {
   complexFieldStack = new adts.Stack<ComplexField>();
   stylesStack = new adts.Stack<number>();
-  bookmarkStack = new adts.Stack<Bookmark>();
 
   /** Combines all styles in the stack */
   currentStyles(): number {
@@ -375,9 +370,6 @@ class Context {
 }
 
 export class Parser {
-  /** bookmarks are indexed by their name, not their id */
-  bookmarks: {[index: string]: Bookmark} = {};
-
   constructor(arraybuffer: ArrayBuffer, public zip = new JSZip(arraybuffer)) { }
 
   get document() {
