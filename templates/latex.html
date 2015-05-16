@@ -2,10 +2,23 @@
 <div class="latex">
 \documentclass{article}
 
+% Converted by xdoc on {{timestamp}}
+
+\usepackage{hyperref}
 \usepackage{fixltx2e}
 \usepackage{times}
 
-% Converted by xdoc on {{timestamp}}
+\usepackage{gb4e}
+\newcommand{\example}[2][norefcode]{
+  \begin{exe}
+    \ex{\label{#1}#2}
+  \end{exe}
+}
+
+\usepackage{cleveref}
+\crefformat{xnumi}{(#2#1#3)}
+\crefformat{xnumii}{(#2#1#3)}
+\crefformat{xnumiii}{(#2#1#3)}
 
 \begin{document}
 {{latex}}

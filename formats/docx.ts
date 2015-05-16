@@ -187,7 +187,8 @@ function readParagraph(paragraph_element: Element, context: Context, parser: Par
 
       // this is kind of a hack
       if (paragraph instanceof xdom.XExample) {
-        paragraph.label = bookmark.name;
+        var code = bookmark.name.replace(/[^A-Z0-9-]/gi, '');
+        paragraph.label = code;
       }
     }
     else {
@@ -313,7 +314,8 @@ function readRun(run: Element, context: Context, parser: Parser): xdom.XNode[] {
         // log('r > fldChar: fldCharType=end');
         var complexField = context.complexFieldStack.pop();
 
-        var field_node = new xdom.XReference(complexField.code, complexField.childNodes, context.currentStyles());
+        var code = complexField.code.replace(/[^A-Z0-9-]/gi, '');
+        var field_node = new xdom.XReference(code, complexField.childNodes, context.currentStyles());
 
         // log('resolving fldChar REF code: "%s"', complexField.code);
         // log('field_node', field_node, 'bookmark', bookmark);
@@ -379,18 +381,16 @@ export class Parser {
   constructor(arraybuffer: ArrayBuffer, public zip = new JSZip(arraybuffer)) { }
 
   get document() {
-    var doc = new xdom.XDocument(this.metadata);
     // the root element of the word/document.xml document is a w:document, which
     // should have one child element, w:body, whose children are a bunch of
     // <w:p> elements (paragraphs)
     var file = this.zip.file('word/document.xml')
     var documentBody = parseXML(file.asText()).documentElement.firstElementChild;
-    childElements(documentBody).forEach(child => {
+    var children = childElements(documentBody).map(child => {
       var context = new Context();
-      var paragraph_node = readParagraph(child, context, this);
-      doc.appendChild(paragraph_node);
+      return readParagraph(child, context, this);
     });
-    return doc;
+    return new xdom.XDocument(this.metadata, children);
   }
 
   /**

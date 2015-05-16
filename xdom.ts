@@ -30,7 +30,6 @@ function t(command: string, content: string): string {
 }
 
 function stringToLaTeX(raw: string): string {
-  // log('Escaping: "%s"', string.encode('utf8'))
   return raw.replace(replacementRegExp, match => replacements[match]);
 }
 
@@ -122,7 +121,6 @@ export class XElement extends XNode {
     if (this.styles & Style.Superscript) {
       content = t('textsuperscript', content);
     }
-
     return content;
   }
 
@@ -200,6 +198,9 @@ export class XParagraph extends XElement {
     return h('div.paragraph', this.getVProperties(),
       this.childNodes.map(childNode => childNode.toVNode()));
   }
+  toLaTeX(): string {
+    return '\n' + super.toLaTeX() + '\n';
+  }
 }
 
 export class XExample extends XParagraph {
@@ -209,6 +210,9 @@ export class XExample extends XParagraph {
     properties['title'] = `label=${this.label}`;
     return h('div.paragraph.example', properties,
       this.childNodes.map(childNode => childNode.toVNode()));
+  }
+  toLaTeX(): string {
+    return t(`example[${this.label}]`, super.toLaTeX());
   }
 }
 
@@ -226,10 +230,14 @@ export class XReference extends XElement {
     return h('span.reference', properties,
       this.childNodes.map(childNode => childNode.toVNode()));
   }
+
+  toLaTeX(): string {
+    return t('Cref', this.code);
+  }
 }
 
 export class XDocument extends XElement {
-  constructor(public metadata: Map<string>) { super() }
+  constructor(public metadata: Map<string>, childNodes: XNode[] = []) { super(childNodes) }
 }
 
 /**
@@ -244,11 +252,17 @@ export class XFootnote extends XElement {
     return h('span.footnote', this.getVProperties(),
       this.childNodes.map(childNode => childNode.toVNode()));
   }
+  toLaTeX(): string {
+    return t('footnote', super.toLaTeX());
+  }
 }
 
 export class XEndnote extends XElement {
   toVNode(): VNode {
     return h('span.endnote', this.getVProperties(),
       this.childNodes.map(childNode => childNode.toVNode()));
+  }
+  toLaTeX(): string {
+    return t('endnote', super.toLaTeX());
   }
 }
