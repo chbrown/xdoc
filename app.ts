@@ -85,7 +85,7 @@ app.directive('uiSrefActiveAny', function($state) {
       uiSrefActiveAny: '=',
     },
     link: function(scope, el) {
-      var activeClasses = scope.uiSrefActiveAny;
+      var activeClasses = scope['uiSrefActiveAny'];
       function updateSrefActiveAny() {
         for (var key in activeClasses) {
           var match = $state.includes(activeClasses[key]);
@@ -199,7 +199,9 @@ app.controller('documentXDocCtrl', ($scope, $localStorage) => {
   var storedFile: StoredFile = $scope.storedFile;
 
   var parser = new docx.Parser(storedFile.arrayBuffer);
-  $scope.document = parser.document;
+  var document = parser.document;
+  document.normalize();
+  $scope.document = document;
 });
 
 app.controller('documentLaTeXCtrl', ($scope) => {
@@ -208,7 +210,9 @@ app.controller('documentLaTeXCtrl', ($scope) => {
   var storedFile: StoredFile = $scope.storedFile;
 
   var parser = new docx.Parser(storedFile.arrayBuffer);
-  $scope.latex = parser.document.toLaTeX();
+  var document = parser.document;
+  document.normalize();
+  $scope.latex = document.toLaTeX();
 });
 
 
@@ -224,13 +228,13 @@ app.directive('xdomDocument', () => {
 
       function update(xDocument: xdom.XDocument) {
         if (vtree === undefined) {
-          vtree = xDocument.toVNode();
+          vtree = xDocument.toVChild();
           element = create(vtree)
           // attach to the dom on the first draw
           el[0].appendChild(element);
         }
         else {
-          var new_vtree = xDocument.toVNode();
+          var new_vtree = xDocument.toVChild();
           var patches = diff(vtree, new_vtree)
           element = patch(element, patches)
           vtree = new_vtree;

@@ -1,7 +1,7 @@
 /// <reference path="type_declarations/index.d.ts" />
 import _ = require('lodash');
 import adts = require('adts');
-import {VNode, VProperties, h} from 'virtual-dom';
+import {VNode, VChild, VProperties, h} from 'virtual-dom';
 import {replacements, replacementRegExp} from './latex';
 import {log, pushAll} from './util';
 
@@ -40,19 +40,40 @@ or, when extended, a node with some semantic role in a document.
 export class XNode {
   constructor() { }
 
-  toVNode(): VNode {
+  get textContent(): string {
+    return '';
+  }
+
+  isWhitespace(): boolean {
+    return true;
+  }
+
+  toVChild(): VChild {
     return h('span', '');
   }
   toLaTeX(): string {
     return '';
   }
+
+  /**
+  The basic normalization is a no-op.
+  */
+  normalize() { }
 }
 
 export class XText extends XNode {
   constructor(public data: string) { super() }
 
-  toVNode(): VNode {
-    return h('span', this.data);
+  get textContent(): string {
+    return this.data;
+  }
+
+  isWhitespace(): boolean {
+    return /^\s+$/.test(this.data);
+  }
+
+  toVChild(): VChild {
+    return this.data;
   }
   toLaTeX(): string {
     return stringToLaTeX(this.data);
@@ -62,6 +83,22 @@ export class XText extends XNode {
 export class XElement extends XNode {
   constructor(public childNodes: XNode[] = [],
               public styles: number = 0) { super() }
+
+  get textContent(): string {
+    // this check and throw is kind of rude
+    // if (!this.containsOnlyText()) {
+    //   throw new Error('Cannot get textContent of XElement with non-XText childNodes');
+    // }
+    return this.childNodes.map(childNode => childNode.textContent).join('');
+  }
+
+  isWhitespace(): boolean {
+    return this.childNodes.every(childNode => childNode.isWhitespace());
+  }
+
+  containsOnlyText(): boolean {
+    return this.childNodes.every(childNode => childNode instanceof XText);
+  }
 
   appendChild(newChild: XNode) {
     this.childNodes.push(newChild);
@@ -98,9 +135,9 @@ export class XElement extends XNode {
 
     return {style: style, title: title};
   }
-  toVNode(): VNode {
-    return h('span', this.getVProperties(),
-      this.childNodes.map(childNode => childNode.toVNode()));
+  toVChild(): VNode {
+    return h('span.element', this.getVProperties(),
+      this.childNodes.map(childNode => childNode.toVChild()));
   }
   toLaTeX(): string {
     var content = this.childNodes.map(childNode => childNode.toLaTeX()).join('');
@@ -124,12 +161,54 @@ export class XElement extends XNode {
     return content;
   }
 
-  /** modifies this WordContainer's children so that contiguous WordSpan
-  objects with the congruent styles are merged into a single WordSpan.
-  This is mostly about whitespace; smoothing out whitespace where possible to
-  match neighbors.
+  normalize() {
+    this.childNodes.forEach(childNode => childNode.normalize());
+  }
+}
 
-  It's easiest to modify existing Span objects, so style cleaning is done in-place
+/**
+Output is similar to XNode's, but returns an actual HTML DOM element,
+a div.paragraph, rather than a document fragment.
+
+Paragraphs can only have XElements (and subclasses) as children, never naked
+XText nodes.
+*/
+export class XParagraph extends XElement {
+  childNodes: XElement[];
+  labels: string[] = [];
+  constructor(childNodes: XElement[] = [],
+              styles: number = 0) { super(childNodes, styles) }
+
+  toVChild(): VNode {
+    var properties = this.getVProperties();
+    properties['title'] = `labels=${this.labels.join(',')}`;
+    return h('div.paragraph', properties,
+      this.childNodes.map(childNode => childNode.toVChild()));
+  }
+  toLaTeX(): string {
+    return '\n' + super.toLaTeX() + this.labels.map(label => t('label', label)).join('') + '\n';
+  }
+
+  /**
+  We will generally normalize a XParagraph's children, which are most often
+  plain XElements that have one child: an XText. This is the typical
+  representation of text runs (w:r) within a text paragraph (w:p).
+
+  We want to take groups of these XElements that have the same styles, and merge
+  them into a single XElement with multiple XText children.
+
+  We do this because Word's text runs (w:r) are often needlessly broken into
+  several identically styled subsequences.
+
+  It also produces more pleasant whitespace. Since most whitespace looks the same,
+  whether it's normal, bold, italic, or anything else, Word will often create
+  superfluous subsequences so that the whitespace runs and their surroundings
+  are broken into several subsequences, though there is no reason to do so.
+
+  You don't notice this in Word, because you don't see the styling markup, but
+  it often produces very ugly LaTeX.
+
+  Normalization is currently done in-place, since that's easier.
 
   * Find groups of contiguous styles (whitespace has flexible styles),
     but de-style whitespace outside such groups.
@@ -137,78 +216,67 @@ export class XElement extends XNode {
     adopt the styles of the most recent non-whitespace span, but that
     isn't pretty.
 
-   TODO: fix implementation
+  TODO: shave off trailing whitespace, so that whitespace is unstyled whenever possible.
   */
-  normalize(): XNode {
-    throw new Error('Not yet implemented');
-    // inner_spans and outer_spans are temporary lists of spans
-    // var inner_spans = [];
-    // var outer_spans = [];
-    // // var current_styles = [];
-    // _.each(this.spans, function(span) {
-    //   // we only want spans that are empty / only whitespace
-    //   if (span.isWhitespace()) {
-    //     outer_spans.push(span);
-    //   }
-    //   else if (_.xor(span.styles, current_styles).length > 0) {
-    //     // if this span's styles are the same as the current styles
-    //     // a non-empty span with identical styles triggers:
-    //     // merging outer_spans into inner_spans
-    //     inner_spans = inner_spans.concat(outer_spans);
-    //     outer_spans = [];
-    //   }
-    //   else {
-    //     // a non-empty span with new styles triggers:
-    //     // 1) applying current_styles to all inner_spans
-    //     for (span in inner_spans) {
-    //       span.styles = current_styles;
-    //     }
-    //     inner_spans = []
-    //     // 2) erasing all styles from outer_spans
-    //     for span in outer_spans:
-    //         span.styles = set()
-    //     outer_spans = []
-    //     // 3) setting current_styles
-    //     current_styles = span.styles
-    //   }
-    // });
+  normalize() { // : XParagraph
+    // normalized_childNodes will replace this XParagraph's childNodes when complete
+    var normalized_childNodes: XElement[] = [];
+    // buffer and buffer_styles will be periodically flushed
+    var buffer: XElement[] = [];
+    // `buffer_styles` could be computed from `buffer` each time it's needed,
+    // but it's just as easy to keep track of it separately
+    var buffer_styles: number;
 
-    // // now that the styles are all sanitized and updated, we can use the standard groupby
-    // span_group_iter = itertools.groupby(self.spans, lambda span: span.styles)
-    // self.spans = [Span.merge(span_group) for styles, span_group in span_group_iter]
-    // return this;
-    // WordSpan....merge = function(spans) {
-    //   /** WordSpan.merge takes a list of spans, joins all of the text together,
-    //      and only keeps the attributes
-    //   */
-    //   var first = spans[0];
-    //   if (first === undefined) throw new Error('You cannot merge an empty list');
-    //   var text = _.pluck(spans, 'text').join('');
-    //   return new WordSpan(text, first.styles, first.attrs);
-    // };
-  }
-}
+    /**
+    merging takes a list of spans, joins all of the text together,
+    and only keeps the styles.
 
-/**
-Output is similar to XNode's, but returns an actual HTML DOM element,
-a div.paragraph, rather than a document fragment
-*/
-export class XParagraph extends XElement {
-  labels: string[] = [];
-  toVNode(): VNode {
-    var properties = this.getVProperties();
-    properties['title'] = `labels=${this.labels.join(',')}`;
-    return h('div.paragraph', properties,
-      this.childNodes.map(childNode => childNode.toVNode()));
-  }
-  toLaTeX(): string {
-    return '\n' + super.toLaTeX() + this.labels.map(label => t('label', label)).join('') + '\n';
+    We assume that all of the nodes have the same styles.
+    */
+    function flush() {
+      // normalize each of the collected nodes
+      buffer.forEach(childNode => childNode.normalize());
+      var merged_textContent = buffer.map(childNode => childNode.textContent).join('');
+      var merged_childNode = new XElement([new XText(merged_textContent)], buffer_styles);
+      normalized_childNodes.push(merged_childNode);
+      // reset the buffer variables
+      buffer = []
+      buffer_styles = undefined;
+    }
+
+    this.childNodes.forEach(childNode => {
+      var containsOnlyText = childNode.containsOnlyText();
+      // only-whitespace always counts as the same style; it's like it has wildcard styles
+      if (childNode.isWhitespace()) {
+        buffer.push(childNode);
+      }
+      // if we don't have any current styles, we set them to whatever comes up first
+      else if (buffer_styles === undefined && containsOnlyText) {
+        buffer.push(childNode);
+        buffer_styles = childNode.styles;
+      }
+      // if this node's styles match the current styles, cool, just add it onto the buffer
+      else if (childNode.styles === buffer_styles && containsOnlyText) {
+        buffer.push(childNode);
+      }
+      // otherwise, it's a style mismatch, so we flush and continue, setting the styles to the offending node's styles
+      else {
+        flush();
+        buffer.push(childNode);
+        buffer_styles = childNode.styles;
+      }
+    });
+
+    // finish up with a final flush
+    flush();
+
+    this.childNodes = normalized_childNodes;
   }
 }
 
 export class XExample extends XParagraph {
-  toVNode(): VNode {
-    var node = super.toVNode();
+  toVChild(): VNode {
+    var node = super.toVChild();
     node.properties['className'] += ' example';
     return node;
   }
@@ -224,11 +292,11 @@ export class XReference extends XElement {
     super(childNodes, styles);
   }
 
-  toVNode(): VNode {
+  toVChild(): VNode {
     var properties = this.getVProperties();
     properties['title'] = `code=${this.code}`;
     return h('span.reference', properties,
-      this.childNodes.map(childNode => childNode.toVNode()));
+      this.childNodes.map(childNode => childNode.toVChild()));
   }
 
   toLaTeX(): string {
@@ -248,9 +316,9 @@ childNodes should always be empty.
 */
 
 export class XFootnote extends XElement {
-  toVNode(): VNode {
+  toVChild(): VNode {
     return h('span.footnote', this.getVProperties(),
-      this.childNodes.map(childNode => childNode.toVNode()));
+      this.childNodes.map(childNode => childNode.toVChild()));
   }
   toLaTeX(): string {
     return t('footnote', super.toLaTeX());
@@ -258,9 +326,9 @@ export class XFootnote extends XElement {
 }
 
 export class XEndnote extends XElement {
-  toVNode(): VNode {
+  toVChild(): VNode {
     return h('span.endnote', this.getVProperties(),
-      this.childNodes.map(childNode => childNode.toVNode()));
+      this.childNodes.map(childNode => childNode.toVChild()));
   }
   toLaTeX(): string {
     return t('endnote', super.toLaTeX());
