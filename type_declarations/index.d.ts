@@ -1,5 +1,4 @@
 /// <reference path="DefinitelyTyped/angularjs/angular.d.ts" />
-/// <reference path="DefinitelyTyped/angularjs/angular-resource.d.ts" />
 /// <reference path="DefinitelyTyped/jszip/jszip.d.ts" />
 /// <reference path="DefinitelyTyped/lodash/lodash.d.ts" />
 /// <reference path="DefinitelyTyped/virtual-dom/virtual-dom.d.ts" />
