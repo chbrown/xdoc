@@ -6,5 +6,6 @@
 
 /// <reference path="../node_modules/adts/adts.d.ts" />
 /// <reference path="../node_modules/coders/coders.d.ts" />
+/// <reference path="../node_modules/xmltree/xmltree.d.ts" />
 
 interface Map<V> { [index: string]: V }
