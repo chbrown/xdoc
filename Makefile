@@ -9,6 +9,9 @@ type_declarations/DefinitelyTyped/%:
 	mkdir -p $(@D)
 	curl -s https://raw.githubusercontent.com/chbrown/DefinitelyTyped/master/$* > $@
 
+$(BIN)/browserify $(BIN)/tsc $(BIN)/watchify:
+	npm install
+
 %.css: %.less $(BIN)/lessc $(BIN)/cleancss
 	$(BIN)/lessc $< | $(BIN)/cleancss --keep-line-breaks --skip-advanced -o $@
 
@@ -20,10 +23,7 @@ type_declarations/DefinitelyTyped/%:
 
 build/bundle.js: app.js $(BIN)/browserify
 	mkdir -p $(@D)
-	$(BIN)/browserify $< -o $@
-
-$(BIN)/browserify $(BIN)/tsc $(BIN)/watchify:
-	npm install
+	$(BIN)/browserify -t browserify-ngannotate $< -o $@
 
 # no need for `trap 'kill $$(jobs -p)' SIGTERM`
 dev: $(BIN)/browserify $(BIN)/watchify
