@@ -26,7 +26,7 @@ table td,table th{padding:1px 4px 2px 2px;vertical-align:top}
 nav{padding:0 5px;z-index:100;font-size:90%;-webkit-user-select:none;-moz-user-select:none;user-select:none}
 nav .tab,nav .text{display:inline-block;vertical-align:middle;padding:3px 6px;margin:3px 3px 0 3px}
 nav .tab{border-radius:2px 2px 0 0}
-nav[fixedflow]{left:0;right:0;background-color:#888}
+nav[fixedflow]{position:fixed;left:0;right:0;background-color:#888}
 nav[fixedflow] .tab{background-color:#DDD}
 nav[fixedflow] .tab.current,nav[fixedflow] .tab:hover{background-color:#FDFDFD}
 nav.sub{background-color:#DDD}
@@ -37,7 +37,7 @@ nav.sub .tab.current,nav.sub .tab:hover{background-color:#FDFDFD}
 .document{padding:5px;font-family:"Times New Roman",Serif;background-color:#89A}
 .document .paragraph{min-height:1.2em;margin:5px 0;padding:2px;white-space:pre-wrap;background-color:#fff}
 .document .example{background-color:#f0f8ff;counter-increment:example}
-.document .example:before{content:"(" counter(example)") "}
+.document .example:before{content:"(" counter(example) ") "}
 .document .reference{background-color:#87ceeb}
 .document .endnote,.document .footnote{display:block;margin:5px 0;padding:2px;font-size:smaller;background-color:#ccc}
 .document.outlined span{outline:1px solid #ffb6c1}

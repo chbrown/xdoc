@@ -14,36 +14,22 @@
   "license": "MIT",
   "dependencies": {
     "adts": "*",
+    "angular": "*",
+    "angular-ui-router": "0.2.13",
     "coders": "*",
+    "flow-copy": "*",
     "jszip": "*",
     "lodash": "*",
+    "ngstorage": "gsklee/ngStorage",
+    "tex": "*",
     "virtual-dom": "*",
-    "tex": "*"
+    "xmltree": "*"
   },
   "devDependencies": {
     "browserify": "*",
-    "watchify": "*",
-    "typescript": "*"
-  },
-  "staticPattern": "build/{file}",
-  "staticDependencies": {
-    "angular": {
-      "filter": [
-        "angular.js",
-        "angular.min.js",
-        "angular-resource.js",
-        "angular-resource.min.js"
-      ]
-    },
-    "angular-ui-router": "*",
-    "jquery": "*",
-    "lodash": "*",
-    "misc-js": {
-      "url": "git://github.com/chbrown/misc-js.git",
-      "filter": [
-        "angular-plugins.js"
-      ]
-    },
-    "ng-storage": "*"
+    "clean-css": "*",
+    "less": "*",
+    "typescript": "latest",
+    "watchify": "*"
   }
 }

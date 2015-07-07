@@ -4,6 +4,8 @@ Development starts at:
 
     http://ghkl/xdoc/
 
+N.b.: `angular-ui-router@0.2.15` introduces a nasty bug that unnecessarily reloads controllers with old state. Use `0.2.13`.
+
 
 ## virtual-dom hyperscript references
 

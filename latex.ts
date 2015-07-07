@@ -120,3 +120,22 @@ export var replacements = {
 };
 
 export var replacementRegExp = new RegExp(Object.keys(replacements).map(escapeRegExp).join('|'), 'g');
+
+var latex_diacritic_commands = {
+  // grave is this direction: \
+  // acute is this direction: /
+  grave: '`',
+  acute: "'",
+  circumflex: "^",
+  tilde: '~',
+  umlaut: '"',
+  ring: 'r',
+  cedilla: 'c',
+  hacek: 'v',
+  breve: 'u',
+  dotover: '.',
+  dotunder: 'd',
+  bar: 'b',
+  macron: '=',
+  ogonek: 'k',
+};

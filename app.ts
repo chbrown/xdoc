@@ -1,11 +1,19 @@
 /// <reference path="type_declarations/index.d.ts" />
 import {VNode, VChild, h, create, diff, patch} from 'virtual-dom';
 
-import JSZip = require('jszip');
-import docx = require('./formats/docx');
 import {base64} from 'coders';
+import JSZip = require('jszip');
+import {XMLRenderer} from 'xmltree';
+
+import docx = require('./formats/docx');
 import {log, flatten, list} from './util';
 import xdom = require('./xdom');
+
+// angular and libraries
+import angular = require('angular');
+import 'angular-ui-router';
+import 'ngstorage';
+import 'flow-copy';
 
 interface StoredFileJSON {
   name: string;
@@ -75,7 +83,7 @@ class StoredFile {
 var app = angular.module('app', [
   'ui.router',
   'ngStorage',
-  'misc-js/angular-plugins',
+  'flow-copy',
 ]);
 
 app.directive('uiSrefActiveAny', function($state) {
@@ -96,6 +104,34 @@ app.directive('uiSrefActiveAny', function($state) {
     }
   };
 });
+
+app.directive('onUpload', function($parse) {
+  /** From misc-js */
+  return {
+    restrict: 'A',
+    compile: function(el, attrs) {
+      var fn = $parse(attrs['onUpload']);
+      return function(scope, element, attr) {
+        // the element we listen to inside the link function should not be the
+        // element from the compile function signature; that one may match up
+        // with the linked one, but maybe not, if this element does not occur
+        // directly in the DOM, e.g., if it's inside a ng-repeat or ng-if.
+        element.on('change', function(event) {
+          scope.$apply(function() {
+            var context: any = {$event: event};
+            if (attrs['multiple']) {
+              context.$files = event.target.files;
+            }
+            else {
+              context.$file = event.target.files[0];
+            }
+            fn(scope, context);
+          });
+        });
+      };
+    }
+  };
+})
 
 app.config(($stateProvider, $urlRouterProvider) => {
   $urlRouterProvider.otherwise(($injector, $location) => {
@@ -140,7 +176,7 @@ app.config(($stateProvider, $urlRouterProvider) => {
   });
 });
 
-app.controller('documentsCtrl', ($scope, $flash) => {
+app.controller('documentsCtrl', ($scope) => {
   var storedFiles: StoredFile[] = Object.keys(localStorage)
     .filter(key => key.match(/^storedfile:/) !== null)
     .map(key => StoredFile.fromJSON(JSON.parse(localStorage.getItem(key))));
@@ -159,7 +195,7 @@ app.controller('documentsCtrl', ($scope, $flash) => {
       $scope.$apply(() => {
         var storedFile = new StoredFile(file.name, file.size, file.type, file.lastModifiedDate, undefined, reader.result);
         localStorage.setItem(storedFile.key, JSON.stringify(storedFile));
-        $flash(`Loaded file "${storedFile.name}" and saved in localStorage`);
+        // $flash(`Loaded file "${storedFile.name}" and saved in localStorage`);
         storedFiles.push(storedFile);
       });
     };
@@ -215,7 +251,6 @@ app.controller('documentLaTeXCtrl', ($scope) => {
   $scope.latex = document.toLaTeX();
 });
 
-
 app.directive('xdomDocument', () => {
   return {
     restrict: 'A',
@@ -250,48 +285,6 @@ app.directive('xdomDocument', () => {
   };
 });
 
-class XMLRenderer {
-  constructor(public blacklist: string[] = []) { }
-
-  protected renderAttributes(attributes: NamedNodeMap): VNode[] {
-    return list(attributes).filter(attr => {
-      return this.blacklist.indexOf(attr.name) == -1;
-    }).map(attr => h('span.attribute',
-      [' ', h('span.name', attr.name), '=', h('span.value', `"${attr.value}"`)]));
-  }
-
-  protected renderXmlNodes(nodes: NodeList): VNode[] {
-    return list(nodes).filter(node => {
-      // return false for element nodes which have a blacklisted tag name
-      return (node.nodeType != Node.ELEMENT_NODE) || this.blacklist.indexOf((<Element>node).tagName) == -1;
-    }).map(node => this.renderXmlNode(node));
-  }
-
-  protected renderXmlNode(node: Node) {
-    if (node.nodeType == Node.TEXT_NODE) {
-      var text = <Text>node;
-      return h('div.text', text.data);
-    }
-    else if (node.nodeType == Node.ELEMENT_NODE) {
-      var element = <Element>node;
-      var tagName = element.tagName;
-      var startTagChildren: VChild[][] = [['<', tagName], this.renderAttributes(element.attributes), ['>']];
-      var startTag = h('span.start', flatten(startTagChildren));
-      var endTag = h('span.end', {}, ['</', tagName, '>']);
-      return h('div.element', [startTag, this.renderXmlNodes(node.childNodes), endTag]);
-    }
-    else {
-      return h('span', `(Ignoring node type = ${node.nodeType})`);
-    }
-  }
-
-  render(xml: string): VNode {
-    var document = new DOMParser().parseFromString(xml, 'application/xml');
-    return h('div', this.renderXmlNodes(document.childNodes));
-  }
-
-}
-
 app.directive('xmlTree', () => {
   return {
     restrict: 'E',
@@ -299,36 +292,25 @@ app.directive('xmlTree', () => {
       xml: '=',
     },
     link: (scope, el) => {
+      var container: Node = el[0];
       var element: Element;
       var vtree: VNode;
 
-      function update(new_vtree: VNode) {
-        if (vtree === undefined) {
-          vtree = new_vtree;
-          element = create(vtree)
-          el[0].appendChild(element);
-        }
-        else {
-          var patches = diff(vtree, new_vtree)
-          element = patch(element, patches)
-          vtree = new_vtree;
-        }
-      }
+      var blacklist = [
+        // revision information
+        'w:rsid', 'w:rsidR', 'w:rsidRDefault', 'w:rsidRPr', 'w:rsidP',
+        // font information
+        'w:rFonts', 'w:ascii', 'w:hAnsi', 'w:cs', 'w:bidi',
+        // font size information
+        'w:sz', 'w:szCs',
+        // list item user interface config
+        'w:nsid', 'w:multiLevelType', 'w:tmpl',
+      ];
+      var renderer = new XMLRenderer(blacklist);
 
       scope.$watch('xml', (xml: string) => {
         if (xml) {
-          var blacklist = [
-            // revision information
-            'w:rsid', 'w:rsidR', 'w:rsidRDefault', 'w:rsidRPr', 'w:rsidP',
-            // font information
-            'w:rFonts', 'w:ascii', 'w:hAnsi', 'w:cs', 'w:bidi',
-            // font size information
-            'w:sz', 'w:szCs',
-            // list item user interface config
-            'w:nsid', 'w:multiLevelType', 'w:tmpl',
-          ];
-          var new_vtree = new XMLRenderer(blacklist).render(xml);
-          update(new_vtree);
+          [element, vtree] = renderer.update(xml, container, element, vtree);
         }
       });
     }

@@ -5,10 +5,14 @@ import {VNode, VChild, VProperties, h} from 'virtual-dom';
 import {replacements, replacementRegExp} from './latex';
 import {log, pushAll} from './util';
 
-// We can do bitwise math in Javascript up to 2^29, so we can have up to
-// 29 styles
-// 2 << 29 ==  1073741824 == 2^30
-// 2 << 30 == -2147483648 != 2^31
+/** We can do bitwise math in Javascript up to 2^29, so we can have up to
+29 styles.
+    2 << 29 ==  1073741824 == 2^30
+    2 << 30 == -2147483648 != 2^31
+But maybe it isn't the best design for Style to be an Enum?
+Think of the colors!
+20150602 12:20:40
+*/
 export enum Style {
   Bold = 1,
   Italic = 2,

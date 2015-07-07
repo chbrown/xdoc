@@ -1,31 +1,32 @@
+BIN := node_modules/.bin
 DTS := lodash/lodash jszip/jszip virtual-dom/virtual-dom \
-	jquery/jquery angularjs/angular angularjs/angular-resource
+	jquery/jquery angularjs/angular
 
-all: build/bundle.js site.css
-
+all: build/bundle.js build/bundle.min.js site.css
 type_declarations: $(DTS:%=type_declarations/DefinitelyTyped/%.d.ts)
 
 type_declarations/DefinitelyTyped/%:
 	mkdir -p $(@D)
 	curl -s https://raw.githubusercontent.com/chbrown/DefinitelyTyped/master/$* > $@
 
-%.css: %.less
-	lessc $< | cleancss --keep-line-breaks --skip-advanced -o $@
+%.css: %.less $(BIN)/lessc $(BIN)/cleancss
+	$(BIN)/lessc $< | $(BIN)/cleancss --keep-line-breaks --skip-advanced -o $@
 
-%.js: %.ts type_declarations | node_modules/.bin/tsc
-	node_modules/.bin/tsc -m commonjs -t ES5 $<
+%.js: %.ts type_declarations $(BIN)/tsc
+	$(BIN)/tsc -m commonjs -t ES5 $<
 
-build/bundle.js: app.js | node_modules/.bin/browserify
+%.min.js: %.js
+	closure-compiler --angular_pass --language_in ECMASCRIPT5 --warning_level QUIET $< >$@
+
+build/bundle.js: app.js $(BIN)/browserify
 	mkdir -p $(@D)
-	node_modules/.bin/browserify $< -v -o $@
+	$(BIN)/browserify $< -o $@
 
-node_modules/.bin/browserify node_modules/.bin/tsc node_modules/.bin/watchify:
+$(BIN)/browserify $(BIN)/tsc $(BIN)/watchify:
 	npm install
 
-SHELL := bash
-
 # no need for `trap 'kill $$(jobs -p)' SIGTERM`
-dev: | node_modules/.bin/browserify node_modules/.bin/watchify
-	(node_modules/.bin/tsc -m commonjs -t ES5 -w *.ts & \
-   node_modules/.bin/watchify app.js -o build/bundle.js -v & \
+dev: $(BIN)/browserify $(BIN)/watchify
+	($(BIN)/tsc -m commonjs -t ES5 -w *.ts & \
+   $(BIN)/watchify app.js -o build/bundle.js -v & \
    wait)
