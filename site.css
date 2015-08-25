@@ -28,10 +28,10 @@ nav .tab,nav .text{display:inline-block;vertical-align:middle;padding:3px 6px;ma
 nav .tab{border-radius:2px 2px 0 0}
 nav[fixedflow]{position:fixed;left:0;right:0;background-color:#888}
 nav[fixedflow] .tab{background-color:#DDD}
-nav[fixedflow] .tab.current,nav[fixedflow] .tab:hover{background-color:#FDFDFD}
+nav[fixedflow] .tab.current,nav[fixedflow] .tab:hover{background-color:#fff}
 nav.sub{background-color:#DDD}
 nav.sub .tab{background-color:#BBB}
-nav.sub .tab.current,nav.sub .tab:hover{background-color:#FDFDFD}
+nav.sub .tab.current,nav.sub .tab:hover{background-color:#fff}
 .wrap{word-break:break-all;white-space:pre-wrap}
 .raw{white-space:pre-wrap}
 .document{padding:5px;font-family:"Times New Roman",Serif;background-color:#89A}

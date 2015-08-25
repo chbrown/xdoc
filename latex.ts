@@ -59,8 +59,9 @@ export var replacements = {
   '⊃': '$\\supset$',
   '⊂': '$\\subset$',
   '≡': '$\\equiv$',
+  '⊆': '$\\subseteq$', // U+2286 SUBSET OF OR EQUAL TO
+  '⊇': '$\\supseteq$',
   '≥': '$\\ge$',
-
 
   '‘': '`',
   '’': "'",
@@ -117,6 +118,9 @@ export var replacements = {
   // ascii symbols (not really a LaTeX issue)
   '==>': '$\\Rightarrow$',
   '||': '\\textbardbl{}',
+
+  // MS Word being so helpful
+  '\u200e': '', // U+200E LEFT-TO-RIGHT MARK
 };
 
 export var replacementRegExp = new RegExp(Object.keys(replacements).map(escapeRegExp).join('|'), 'g');

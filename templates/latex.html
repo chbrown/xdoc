@@ -1,27 +1,12 @@
 <section class="hpad">
-<div class="latex">
-\documentclass{article}
+  <label>
+    <b>Layout</b>
+    <select ng-model="$storage.layout"
+      ng-options="layout as layout for (layout, layoutFunction) in layouts"></select>
+  </label>
+  <a download="paper.tex">Download .tex</a>
+</section>
 
-% Converted by xdoc on {{timestamp}}
-
-\usepackage{hyperref}
-\usepackage{fixltx2e}
-\usepackage{times}
-
-\usepackage{gb4e}
-\newcommand{\example}[1]{
-  \begin{exe}
-    \ex{#1}
-  \end{exe}
-}
-
-\usepackage{cleveref}
-\crefformat{xnumi}{(#2#1#3)}
-\crefformat{xnumii}{(#2#1#3)}
-\crefformat{xnumiii}{(#2#1#3)}
-
-\begin{document}
-{{latex}}
-\end{document}
-</div>
+<section class="hpad">
+  <div class="latex" ng-bind="latex"></div>
 </section>

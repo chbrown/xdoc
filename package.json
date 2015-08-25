@@ -9,28 +9,33 @@
     "dom"
   ],
   "homepage": "https://chbrown.github.io/xdoc",
-  "repository": "git://github.com/chbrown/xdoc.git",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chbrown/xdoc.git"
+  },
   "author": "Christopher Brown <io@henrian.com> (http://henrian.com)",
   "license": "MIT",
   "dependencies": {
     "adts": "*",
     "angular": "*",
     "angular-ui-router": "0.2.13",
+    "arrays": "chbrown/arrays",
     "coders": "*",
     "flow-copy": "*",
     "jszip": "*",
     "lodash": "*",
     "ngstorage": "gsklee/ngStorage",
+    "ng-upload": "*",
+    "notify-ui": "*",
     "tex": "*",
     "virtual-dom": "*",
     "xmltree": "*"
   },
   "devDependencies": {
-    "browserify": "*",
-    "browserify-ngannotate": "*",
-    "clean-css": "*",
-    "less": "*",
-    "typescript": "latest",
-    "watchify": "*"
+    "css-loader": "*",
+    "less-loader": "*",
+    "style-loader": "*",
+    "typescript": "*",
+    "webpack": "*"
   }
 }

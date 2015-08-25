@@ -3,7 +3,8 @@ import _ = require('lodash');
 import adts = require('adts');
 import {VNode, VChild, VProperties, h} from 'virtual-dom';
 import {replacements, replacementRegExp} from './latex';
-import {log, pushAll} from './util';
+import {log} from './util';
+import {pushAll} from 'arrays';
 
 /** We can do bitwise math in Javascript up to 2^29, so we can have up to
 29 styles.
@@ -180,8 +181,9 @@ XText nodes.
 export class XParagraph extends XElement {
   childNodes: XElement[];
   labels: string[] = [];
-  constructor(childNodes: XElement[] = [],
-              styles: number = 0) { super(childNodes, styles) }
+  constructor(childNodes: XElement[] = [], styles: number = 0) {
+    super(childNodes, styles);
+  }
 
   toVChild(): VNode {
     var properties = this.getVProperties();

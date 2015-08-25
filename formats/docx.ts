@@ -7,10 +7,11 @@ This is the part that needs to worry about the difference between w:p and w:r
 */
 
 import JSZip = require('jszip');
-import adts = require('adts');
+import {Stack} from 'adts';
 import xdom = require('../xdom');
 import characters = require('../characters');
-import {log, memoize, list} from '../util';
+import {log, memoize} from '../util';
+import {toArray} from 'arrays';
 
 class ComplexField extends xdom.XElement {
   /** `separated` is set to true when w:fldChar[fldCharType="separate"] is reached. */
@@ -22,7 +23,7 @@ class ComplexField extends xdom.XElement {
 }
 
 function childElements(node: Node): Element[] {
-  var children = list(node.childNodes).filter(childNode => childNode.nodeType == Node.ELEMENT_NODE);
+  var children = toArray(node.childNodes).filter(childNode => childNode.nodeType == Node.ELEMENT_NODE);
   return <Element[]>children;
 }
 
@@ -98,7 +99,7 @@ body will most often be a <w:body> element, but may also be a
 The returned node's .childNodes will be xdom.XParagraph objects.
 */
 function readBody(body: Element, context: Context, parser: Parser): xdom.XElement {
-  var childNodes = list(body.childNodes)
+  var childNodes = toArray(body.childNodes)
     .filter(childNode => childNode.nodeType == Node.ELEMENT_NODE)
     .map((element: Element) => readParagraph(element, context, parser));
   return new xdom.XElement(childNodes);
@@ -127,6 +128,7 @@ function readParagraph(paragraph_element: Element, context: Context, parser: Par
           paragraph = new xdom.XExample(paragraph.childNodes, paragraph.styles);
         }
         else {
+          // TODO
           log('ignoring pPr > pStyle', pStyle_val);
         }
       }
@@ -175,7 +177,7 @@ function readParagraph(paragraph_element: Element, context: Context, parser: Par
       // for now, I'm just going to assume that labels apply only to the
       // paragraph in which they start, and that they apply to the whole paragraph
       // (this is kind of a hack)
-      log('reading bookmark', id, name);
+      //log('reading bookmark', id, name);
 
       if (paragraph instanceof xdom.XExample) {
         var code = name.replace(/[^A-Z0-9-]/gi, '');
@@ -360,8 +362,8 @@ function readRun(run: Element, context: Context, parser: Parser): xdom.XNode[] {
 }
 
 class Context {
-  complexFieldStack = new adts.Stack<ComplexField>();
-  stylesStack = new adts.Stack<number>();
+  complexFieldStack = new Stack<ComplexField>();
+  stylesStack = new Stack<number>();
 
   /** Combines all styles in the stack */
   currentStyles(): number {
@@ -376,7 +378,7 @@ export class Parser {
     // the root element of the word/document.xml document is a w:document, which
     // should have one child element, w:body, whose children are a bunch of
     // <w:p> elements (paragraphs)
-    var file = this.zip.file('word/document.xml')
+    var file = this.zip.file('word/document.xml');
     var documentBody = parseXML(file.asText()).documentElement.firstElementChild;
     var children = childElements(documentBody).map(child => {
       var context = new Context();

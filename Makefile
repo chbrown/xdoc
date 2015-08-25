@@ -1,32 +1,23 @@
 BIN := node_modules/.bin
 DTS := lodash/lodash jszip/jszip virtual-dom/virtual-dom \
-	jquery/jquery angularjs/angular
+	jquery/jquery angularjs/angular react/react react/react-addons
 
-all: build/bundle.js build/bundle.min.js site.css
+all: build/bundle.js site.css
 type_declarations: $(DTS:%=type_declarations/DefinitelyTyped/%.d.ts)
 
 type_declarations/DefinitelyTyped/%:
 	mkdir -p $(@D)
-	curl -s https://raw.githubusercontent.com/chbrown/DefinitelyTyped/master/$* > $@
+	curl -s https://raw.githubusercontent.com/borisyankov/DefinitelyTyped/master/$* > $@
 
-$(BIN)/browserify $(BIN)/tsc $(BIN)/watchify:
+$(BIN)/tsc $(BIN)/webpack:
 	npm install
 
-%.css: %.less $(BIN)/lessc $(BIN)/cleancss
-	$(BIN)/lessc $< | $(BIN)/cleancss --keep-line-breaks --skip-advanced -o $@
-
 %.js: %.ts type_declarations $(BIN)/tsc
-	$(BIN)/tsc -m commonjs -t ES5 $<
+	$(BIN)/tsc --experimentalDecorators -m commonjs -t ES5 $<
 
-%.min.js: %.js
-	closure-compiler --angular_pass --language_in ECMASCRIPT5 --warning_level QUIET $< >$@
-
-build/bundle.js: app.js $(BIN)/browserify
+build/bundle.js: webpack.config.js app.js $(BIN)/webpack
 	mkdir -p $(@D)
-	$(BIN)/browserify -t browserify-ngannotate $< -o $@
+	NODE_ENV=production $(BIN)/webpack --config $<
 
-# no need for `trap 'kill $$(jobs -p)' SIGTERM`
-dev: $(BIN)/browserify $(BIN)/watchify
-	($(BIN)/tsc -m commonjs -t ES5 -w *.ts & \
-   $(BIN)/watchify app.js -o build/bundle.js -v & \
-   wait)
+dev: webpack.config.js $(BIN)/webpack
+	$(BIN)/webpack --watch --config $<

@@ -1,18 +1,25 @@
 /// <reference path="type_declarations/index.d.ts" />
-import {VNode, VChild, h, create, diff, patch} from 'virtual-dom';
-
 import {base64} from 'coders';
 import JSZip = require('jszip');
-import {XMLRenderer} from 'xmltree';
+import {flatten, toArray} from 'arrays';
+import {NotifyUI} from 'notify-ui';
+import {VNode, VChild, h, create, diff, patch} from 'virtual-dom';
+// import React from 'react';
 
-import docx = require('./formats/docx');
-import {log, flatten, list} from './util';
-import xdom = require('./xdom');
+var xmltree = require('xmltree/virtual-dom');
+
+import {Parser} from './formats/docx';
+import {log} from './util';
+import {XDocument} from './xdom';
+import * as layouts from './layouts';
+
+import './site.less';
 
 // angular and libraries
 import angular = require('angular');
 import 'angular-ui-router';
 import 'ngstorage';
+import 'ng-upload';
 import 'flow-copy';
 
 interface StoredFileJSON {
@@ -83,6 +90,7 @@ class StoredFile {
 var app = angular.module('app', [
   'ui.router',
   'ngStorage',
+  'ngUpload',
   'flow-copy',
 ]);
 
@@ -104,34 +112,6 @@ app.directive('uiSrefActiveAny', function($state) {
     }
   };
 });
-
-app.directive('onUpload', function($parse) {
-  /** From misc-js */
-  return {
-    restrict: 'A',
-    compile: function(el, attrs) {
-      var fn = $parse(attrs['onUpload']);
-      return function(scope, element, attr) {
-        // the element we listen to inside the link function should not be the
-        // element from the compile function signature; that one may match up
-        // with the linked one, but maybe not, if this element does not occur
-        // directly in the DOM, e.g., if it's inside a ng-repeat or ng-if.
-        element.on('change', function(event) {
-          scope.$apply(function() {
-            var context: any = {$event: event};
-            if (attrs['multiple']) {
-              context.$files = event.target.files;
-            }
-            else {
-              context.$file = event.target.files[0];
-            }
-            fn(scope, context);
-          });
-        });
-      };
-    }
-  };
-})
 
 app.config(($stateProvider, $urlRouterProvider) => {
   $urlRouterProvider.otherwise(($injector, $location) => {
@@ -195,7 +175,7 @@ app.controller('documentsCtrl', ($scope) => {
       $scope.$apply(() => {
         var storedFile = new StoredFile(file.name, file.size, file.type, file.lastModifiedDate, undefined, reader.result);
         localStorage.setItem(storedFile.key, JSON.stringify(storedFile));
-        // $flash(`Loaded file "${storedFile.name}" and saved in localStorage`);
+        NotifyUI.add(`Loaded file "${storedFile.name}" and saved in localStorage`);
         storedFiles.push(storedFile);
       });
     };
@@ -234,21 +214,34 @@ app.controller('documentXDocCtrl', ($scope, $localStorage) => {
 
   var storedFile: StoredFile = $scope.storedFile;
 
-  var parser = new docx.Parser(storedFile.arrayBuffer);
+  var parser = new Parser(storedFile.arrayBuffer);
   var document = parser.document;
   document.normalize();
   $scope.document = document;
 });
 
-app.controller('documentLaTeXCtrl', ($scope) => {
-  $scope.timestamp = new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '');
+app.controller('documentLaTeXCtrl', ($scope, $localStorage) => {
+  $scope.$storage = $localStorage.$default({layout: 'plain'});
 
   var storedFile: StoredFile = $scope.storedFile;
-
-  var parser = new docx.Parser(storedFile.arrayBuffer);
+  var parser = new Parser(storedFile.arrayBuffer);
   var document = parser.document;
   document.normalize();
-  $scope.latex = document.toLaTeX();
+
+  $scope.layouts = layouts;
+  $scope.$watch('$storage.layout', (layout: string) => {
+    if (layout) {
+      $scope.latex = layouts[layout](document);
+      // uggh, angular, why must you be so difficult?
+      var data_url = `data:text/plain;charset=utf-8,${encodeURIComponent($scope.latex)}`;
+      var anchor = window.document.querySelector('a[download]');
+      anchor['href'] = data_url;
+    }
+    else {
+      $scope.latex_href = '';
+      $scope.latex = '';
+    }
+  });
 });
 
 app.directive('xdomDocument', () => {
@@ -261,7 +254,7 @@ app.directive('xdomDocument', () => {
       var element: Element;
       var vtree: VNode;
 
-      function update(xDocument: xdom.XDocument) {
+      function update(xDocument: XDocument) {
         if (vtree === undefined) {
           vtree = xDocument.toVChild();
           element = create(vtree)
@@ -276,7 +269,7 @@ app.directive('xdomDocument', () => {
         }
       }
 
-      scope.$watch('xdomDocument', (xDocument: xdom.XDocument) => {
+      scope.$watch('xdomDocument', (xDocument: XDocument) => {
         if (xDocument) {
           update(angular.copy(xDocument));
         }
@@ -306,7 +299,7 @@ app.directive('xmlTree', () => {
         // list item user interface config
         'w:nsid', 'w:multiLevelType', 'w:tmpl',
       ];
-      var renderer = new XMLRenderer(blacklist);
+      var renderer = new xmltree.XMLRenderer(blacklist);
 
       scope.$watch('xml', (xml: string) => {
         if (xml) {
