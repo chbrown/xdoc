@@ -59,15 +59,13 @@ export function semprag(document: XDocument) {
   });
 
   var addresses = authors.map(author => {
-    return `
-  \\begin{address}
+    return `  \\begin{address}
     ${author.name} \\\\
     ${author.department} \\\\
     ${author.institute} \\\\
     ${author.address} \\\\
     \\email{${author.email}}
-  \\end{address}
-  `;
+  \\end{address}`;
   });
 
   var abstract = 'TODO: abstract';
@@ -77,12 +75,6 @@ return `\\documentclass[lucida,biblatex]{sp}
 % Converted by xdoc on ${timestamp}
 
 \\usepackage{gb4e-emulate}
-
-\\newcommand{\\example}[1]{
-  \\begin{exe}
-    \\ex{#1}
-  \\end{exe}
-}
 
 %\\addbibresource{paper.bib}
 
@@ -120,7 +112,7 @@ ${latex}
 \\printbibliography
 
 \\begin{addresses}
-  ${addresses.join('')}
+  ${addresses.join('\n')}
 \\end{addresses}
 
 \\end{document}
