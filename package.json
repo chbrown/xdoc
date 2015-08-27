@@ -36,6 +36,7 @@
   "devDependencies": {
     "css-loader": "*",
     "less-loader": "*",
+    "mocha": "*",
     "style-loader": "*",
     "typescript": "*",
     "webpack": "*"
