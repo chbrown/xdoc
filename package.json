@@ -13,6 +13,7 @@
     "type": "git",
     "url": "https://github.com/chbrown/xdoc.git"
   },
+  "private": true,
   "author": "Christopher Brown <io@henrian.com> (http://henrian.com)",
   "license": "MIT",
   "dependencies": {
@@ -27,6 +28,7 @@
     "ngstorage": "gsklee/ngStorage",
     "ng-upload": "*",
     "notify-ui": "*",
+    "object-assign": "*",
     "tex": "*",
     "virtual-dom": "*",
     "xmltree": "*"

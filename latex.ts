@@ -1,5 +1,9 @@
 // http://en.wikibooks.org/wiki/LaTeX/Special_Characters#Escaped_codes
-import {escapeRegExp} from './util';
+import {pushAll, flatMap} from 'arrays';
+import {Stack} from 'adts';
+
+import {escapeRegExp, isWhitespace, join} from './util';
+import {Style, XNode, XText, XTextContainer, XContainer} from './xdom';
 
 export var replacements = {
   // these need to be first!
@@ -123,9 +127,9 @@ export var replacements = {
   '\u200e': '', // U+200E LEFT-TO-RIGHT MARK
 };
 
-export var replacementRegExp = new RegExp(Object.keys(replacements).map(escapeRegExp).join('|'), 'g');
+export const replacementRegExp = new RegExp(Object.keys(replacements).map(escapeRegExp).join('|'), 'g');
 
-var latex_diacritic_commands = {
+const latex_diacritic_commands = {
   // grave is this direction: \
   // acute is this direction: /
   grave: '`',
@@ -143,3 +147,191 @@ var latex_diacritic_commands = {
   macron: '=',
   ogonek: 'k',
 };
+
+function applyReplacements(raw: string): string {
+  return raw.replace(replacementRegExp, match => replacements[match]);
+}
+
+export function t(command: string, content: string): string {
+  return `\\${command}{${content}}`;
+}
+
+export function e(environment: string, content: string): string {
+  return `\\begin{${environment}}
+  ${content}
+\\end{${environment}}`;
+}
+
+export function calculateFlags(x: number): number[] {
+  var flags: number[] = [];
+  // this could probably be smarter
+  for (var power = 0; power < 29; power++) {
+    var flag = Math.pow(2, power);
+    if (x & flag) {
+      flags.push(flag);
+    }
+  }
+  return flags;
+}
+
+function getStyleCommand(style: number): string {
+  switch (style) {
+    case Style.Bold:
+      return 'textbf';
+    case Style.Italic:
+      return 'textit';
+    case Style.Underline:
+      return 'underline';
+    case Style.Subscript:
+      return 'textsubscript';
+    case Style.Superscript:
+      return 'textsuperscript';
+    default:
+      throw new Error('Invalid style: ' + style);
+  }
+}
+
+export function stringifyXNodes(nodes: XNode[]): string {
+  // first step is to loop through the nodes, grouping contiguous XText nodes into `xTexts_buffer`
+  var grouped_nodes: XNode[] = [];
+  nodes.forEach(node => {
+    if (node instanceof XText) {
+      // avoid using a buffer by checking for a current XTextContainer and
+      // adding one if needed
+      var last_grouped_node = grouped_nodes[grouped_nodes.length - 1];
+      var xTextContainer: XTextContainer;
+      if (last_grouped_node instanceof XTextContainer) {
+        xTextContainer = last_grouped_node;
+      }
+      else {
+        xTextContainer = new XTextContainer();
+        grouped_nodes.push(xTextContainer);
+      }
+      xTextContainer.xTexts.push(node);
+    }
+    else {
+      grouped_nodes.push(node);
+    }
+  });
+
+  // return this.childNodes.map(childNode => childNode.toLaTeX()).join('');
+  return join(grouped_nodes, node => node.toLaTeX(), (left, right) => {
+    if (left instanceof XContainer && right instanceof XContainer) {
+      return '\n\n';
+    }
+    return '';
+  });
+}
+
+class TeXString {
+  constructor(private data: string) { }
+  toString(): string {
+    return applyReplacements(this.data);
+  }
+}
+
+class TeXNode {
+  /**
+  Only the root node should have a null `command` value.
+  */
+  constructor(private command: string, public children: Array<TeXNode | TeXString> = []) { }
+
+  toString(): string {
+    var content = this.children.map(child => child.toString()).join('');
+    if (this.command !== null) {
+      content = t(this.command, content);
+    }
+    return content;
+  }
+  push(child: TeXNode | TeXString) {
+    this.children.push(child);
+  }
+  static findParent(parent: TeXNode, searchChild: TeXNode): TeXNode {
+    for (var i = 0; i < parent.children.length; i++) {
+      var child = parent.children[i];
+      if (child instanceof TeXNode) {
+        if (child === searchChild) {
+          return parent;
+        }
+        var found = TeXNode.findParent(child, searchChild);
+        if (found) {
+          return found;
+        }
+      }
+    }
+  }
+}
+
+
+/**
+Take a list of XText spans, optimize the ordering of the styles, and join all
+of the text together into a single string.
+*/
+export function stringifyXTexts(nodes: XText[]): string {
+  // split off all hanging whitespace so that we can deal with it separately
+  // from the contentful spans
+  var queue = flatMap(nodes, xText => {
+    var hanging_whitespace_match = xText.data.match(/^(\s+)?([\S\s]+?)(\s+)?$/);
+    // hanging_whitespace_match will match anything but the empty string
+    var [, left, middle, right] = hanging_whitespace_match;
+    // left and/or right might be undefined
+    xText.data = middle;
+    return [...(left ? [new XText(left)] : []), xText, ...(right ? [new XText(right)] : [])]
+  });
+
+  var whitespace_buffer: string = '';
+
+  // okay, now we need to take this flat list of styled nodes and arrange it into a tree of nested styles
+  var tree = new TeXNode(null);
+  var treeCursor = tree;
+  // treeCursorStyles is a list of nested styles. For example: [1, 3] would be a stack of [bold, bold|italic]
+  var treeCursorStyles = new Stack<number>([0]);
+
+  while (queue.length) {
+    var xText = queue.shift();
+    // only-whitespace always counts as the same style; it's like it has wildcard styles
+    if (isWhitespace(xText.data)) {
+      whitespace_buffer += xText.data;
+    }
+    else {
+      // we might need to pop until we can add styles
+      // this should never pop past the root node of treeCursorStyles, which will always be 0
+      while ((xText.styles & treeCursorStyles.top) !== treeCursorStyles.top) {
+        treeCursorStyles.pop();
+        treeCursor = TeXNode.findParent(tree, treeCursor);
+      }
+
+      // okay, we're now at the lowest point we need to be to be able to
+      // accommodate the new node by adding styles
+      // this lowest point is precisely where we want to insert the whitespace buffer
+      if (whitespace_buffer) {
+        treeCursor.push(new TeXString(whitespace_buffer));
+        whitespace_buffer = '';
+      }
+
+      // find the styles to add to get from treeCursorStyles.top to xText.styles
+      // (bold=1 ^ bold|italic|underline=7) = italic|underline=6
+      var styles_to_add = calculateFlags(xText.styles ^ treeCursorStyles.top);
+      styles_to_add.forEach(style => {
+        // add a node to the tree
+        var command = getStyleCommand(style);
+        var child = new TeXNode(command);
+        treeCursor.push(child);
+        treeCursor = child;
+        // update the total styles represented at treeCursor
+        treeCursorStyles.push(treeCursorStyles.top | style);
+      });
+      // okay, cursor now points to the right place
+      treeCursor.push(new TeXString(xText.data));
+    }
+  }
+
+  // final flush
+  if (whitespace_buffer) {
+    treeCursor.push(new TeXString(whitespace_buffer));
+    whitespace_buffer = '';
+  }
+
+  // okay, now we serialize the command tree into a single string
+  return tree.toString();
+}

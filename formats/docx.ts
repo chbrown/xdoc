@@ -11,15 +11,15 @@ import {Stack} from 'adts';
 import xdom = require('../xdom');
 import characters = require('../characters');
 import {log, memoize} from '../util';
-import {toArray} from 'arrays';
+import {pushAll, toArray} from 'arrays';
 
-class ComplexField extends xdom.XElement {
+class ComplexField {
   /** `separated` is set to true when w:fldChar[fldCharType="separate"] is reached. */
   separated = false;
   /** `code` is set to the value of a <w:instrText> that contains a 'REF ...' value. */
   code: string;
   /** `childNodes` is a container of the nodes between the "separate" and the "end" markers */
-  constructor() { super() }
+  constructor(public childNodes: xdom.XNode[] = []) { }
 }
 
 function childElements(node: Node): Element[] {
@@ -98,11 +98,11 @@ body will most often be a <w:body> element, but may also be a
 
 The returned node's .childNodes will be xdom.XParagraph objects.
 */
-function readBody(body: Element, context: Context, parser: Parser): xdom.XElement {
+function readBody(body: Element, context: Context, parser: Parser): xdom.XContainer[] {
   var childNodes = toArray(body.childNodes)
     .filter(childNode => childNode.nodeType == Node.ELEMENT_NODE)
     .map((element: Element) => readParagraph(element, context, parser));
-  return new xdom.XElement(childNodes);
+  return childNodes;
 }
 
 /**
@@ -111,8 +111,8 @@ p should be a DOM Element <w:p> from the original Word document XML.
 returns a single xdom.XNode, which will have a bunch of XNode children
 (which can then be joined based on style congruence)
 */
-function readParagraph(paragraph_element: Element, context: Context, parser: Parser): xdom.XParagraph {
-  var paragraph = new xdom.XParagraph();
+function readParagraph(paragraph_element: Element, context: Context, parser: Parser): xdom.XContainer {
+  var paragraph: xdom.XContainer = new xdom.XContainer();
   context.stylesStack.push(0);
 
   // we need to read w:p's children in a loop, because each w:p's is not a constituent
@@ -125,10 +125,18 @@ function readParagraph(paragraph_element: Element, context: Context, parser: Par
       if (pStyle) {
         var pStyle_val = pStyle.getAttribute('w:val');
         if (pStyle_val == 'ListNumber') {
-          paragraph = new xdom.XExample(paragraph.childNodes, paragraph.styles);
+          paragraph = new xdom.XExample(paragraph.childNodes);
+        }
+        else if (pStyle_val == 'Heading1') {
+          paragraph = new xdom.XSection(paragraph.childNodes);
+        }
+        else if (pStyle_val == 'Heading2') {
+          paragraph = new xdom.XSubsection(paragraph.childNodes);
+        }
+        else if (pStyle_val == 'Heading3') {
+          paragraph = new xdom.XSubsubsection(paragraph.childNodes);
         }
         else {
-          // TODO
           log('ignoring pPr > pStyle', pStyle_val);
         }
       }
@@ -139,7 +147,7 @@ function readParagraph(paragraph_element: Element, context: Context, parser: Par
       // if we are within a complex field stack, we append to that rather than the current paragraph
       if (context.complexFieldStack.top) {
         // by the time we get to runs inside a complexField, `context.complexFieldStack.top.separated` should be true
-        context.complexFieldStack.top.appendChildren(nodes);
+        pushAll(context.complexFieldStack.top.childNodes, nodes);
       }
       else {
         paragraph.appendChildren(nodes);
@@ -202,13 +210,14 @@ Read the contents of a single w:r element (`run`) as a list of XNodes
 
 context is the mutable state Context object.
 */
-function readRun(run: Element, context: Context, parser: Parser): xdom.XNode[] {
+function readRun(run: Element, context: Context, parser: Parser): xdom.XNode[] { // xdom.XText | xdom.XFootnote | xdom.XFootnote
   var nodes: xdom.XNode[] = [];
 
   context.stylesStack.push(0);
-  // an <w:r> will generally contain only one interesting element besides rPr,
+  // an <w:r> will generally (always?) contain only one interesting element besides rPr,
   //   e.g., text, footnote reference, endnote reference, or a symbol
   //   but we still iterate through them all; more elegant than multiple find()'s
+  // for (var i = 0, ; i < l; i++) {
   childElements(run).forEach(child => {
     var tag = dropNS(child.tagName);
     if (tag == 'rPr') {
@@ -248,15 +257,15 @@ function readRun(run: Element, context: Context, parser: Parser): xdom.XNode[] {
         text = shifted_char_code; // symbol_map.get(sym_char)
       }
 
-      var sym_node = new xdom.XElement([new xdom.XText(text)], context.currentStyles());
+      var sym_node = new xdom.XText(text, context.currentStyles());
       nodes.push(sym_node);
     }
     else if (tag == 't') {
-      var t_node = new xdom.XElement([new xdom.XText(child.textContent)], context.currentStyles());
+      var t_node = new xdom.XText(child.textContent, context.currentStyles());
       nodes.push(t_node);
     }
     else if (tag == 'tab') {
-      var tab_node = new xdom.XElement([new xdom.XText('\t')], context.currentStyles());
+      var tab_node = new xdom.XText('\t', context.currentStyles());
       nodes.push(tab_node);
     }
     else if (tag == 'instrText') {
@@ -309,10 +318,10 @@ function readRun(run: Element, context: Context, parser: Parser): xdom.XNode[] {
         // log('r > fldChar: fldCharType=end');
         var complexField = context.complexFieldStack.pop();
         if (complexField) {
-          var field_node = new xdom.XElement(complexField.childNodes, context.currentStyles());
+          var field_node: xdom.XNode = new xdom.XContainer(complexField.childNodes);
           if (complexField.code) {
             var code = complexField.code.replace(/[^A-Z0-9-]/gi, '');
-            field_node = new xdom.XReference(code, complexField.childNodes, context.currentStyles());
+            field_node = new xdom.XReference(code, complexField.childNodes);
           }
           nodes.push(field_node);
         }
@@ -331,6 +340,10 @@ function readRun(run: Element, context: Context, parser: Parser): xdom.XNode[] {
         throw new Error(`r > fldChar: Unrecognized fldCharType: ${field_signal}`);
       }
     }
+    else if (tag == 'br') {
+      var break_node = new xdom.XText('\n', context.currentStyles());
+      nodes.push(break_node);
+    }
     else if (tag == 'separator') {
       // this denotes the horizontal line in footnotes
       // http://msdn.microsoft.com/en-us/library/documentformat.openxml.wordprocessing.separatormark(v=office.14).aspx
@@ -348,15 +361,18 @@ function readRun(run: Element, context: Context, parser: Parser): xdom.XNode[] {
     else if (tag == 'lastRenderedPageBreak') {
       // should this equate to some kind of page break? I don't think so.
     }
-    else if (tag == 'br') {
-      var break_node = new xdom.XElement([new xdom.XText('\n')], context.currentStyles());
-      nodes.push(break_node);
+    else if (tag == 'softHyphen') {
+      // um, just ignore for now
     }
     else {
       log('r > %s ignored', tag); // , child
     }
   });
   context.stylesStack.pop();
+
+  if (nodes.length > 1) {
+    log('readRun returning %d nodes', nodes.length, nodes);
+  }
 
   return nodes;
 }
@@ -404,8 +420,8 @@ export class Parser {
         var id = child.getAttribute('w:id');
         // each w:footnote has a bunch of w:p children, like a w:body
         var context = new Context();
-        var container = readBody(child, context, this);
-        footnotes[id] = new xdom.XFootnote(container.childNodes);
+        var container_childNodes = readBody(child, context, this);
+        footnotes[id] = new xdom.XFootnote(container_childNodes);
       });
     }
     return footnotes;
@@ -424,8 +440,9 @@ export class Parser {
       childElements(document.documentElement).forEach(child => {
         var id = child.getAttribute('w:id');
         var context = new Context();
-        var container = readBody(child, context, this);
-        endnotes[id] = new xdom.XFootnote(container.childNodes);
+        var container_childNodes = readBody(child, context, this);
+        // TODO: why does it compile if I use xdom.XFootnote below?
+        endnotes[id] = new xdom.XEndnote(container_childNodes);
       });
     }
     return endnotes;

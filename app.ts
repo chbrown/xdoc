@@ -145,6 +145,11 @@ app.config(($stateProvider, $urlRouterProvider) => {
     templateUrl: 'templates/xdoc.html',
     controller: 'documentXDocCtrl',
   })
+  .state('document.xdocjson', {
+    url: '/xdocjson',
+    templateUrl: 'templates/xdocjson.html',
+    controller: 'documentXDocJSONCtrl',
+  })
   // .state('validate', {
   //   url: '/validate',
   //   templateUrl: 'templates/validate.html',
@@ -216,7 +221,13 @@ app.controller('documentXDocCtrl', ($scope, $localStorage) => {
 
   var parser = new Parser(storedFile.arrayBuffer);
   var document = parser.document;
-  document.normalize();
+  $scope.document = document;
+});
+
+app.controller('documentXDocJSONCtrl', ($scope, $localStorage) => {
+  var storedFile: StoredFile = $scope.storedFile;
+  var parser = new Parser(storedFile.arrayBuffer);
+  var document = parser.document;
   $scope.document = document;
 });
 
@@ -226,7 +237,6 @@ app.controller('documentLaTeXCtrl', ($scope, $localStorage) => {
   var storedFile: StoredFile = $scope.storedFile;
   var parser = new Parser(storedFile.arrayBuffer);
   var document = parser.document;
-  document.normalize();
 
   $scope.layouts = layouts;
   $scope.$watch('$storage.layout', (layout: string) => {
