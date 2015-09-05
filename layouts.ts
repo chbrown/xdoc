@@ -82,6 +82,9 @@ return `\\documentclass[lucida,biblatex]{sp}
 \\crefformat{xnumi}{(#2#1#3)}
 \\crefformat{xnumii}{(#2#1#3)}
 \\crefformat{xnumiii}{(#2#1#3)}
+\\crefformat{exei}{(#2#1#3)}
+\\crefformat{exeii}{(#2#1#3)}
+\\crefformat{exeiii}{(#2#1#3)}
 
 \\pdfauthor{${author_names.join(' ')}}
 \\pdftitle{${title}}

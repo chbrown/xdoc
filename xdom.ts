@@ -57,7 +57,7 @@ export class XText extends XNode {
               public styles: number = 0) { super() }
 
   toVChild(): VChild {
-    return this.data;
+    return h('span', this.data);
   }
   toLaTeX(): string {
     // normally, this won't be called
@@ -82,7 +82,7 @@ export class XReference extends XNode {
   constructor(public code: string, public childNodes: XNode[] = []) { super() }
 
   toVChild(): VNode {
-    return h('span.reference', {}, `code=${this.code}`);
+    return h('div.reference', {}, `code=${this.code}`);
     // this.childNodes.map(childNode => childNode.toVChild()));
   }
   toLaTeX(): string {
@@ -90,8 +90,9 @@ export class XReference extends XNode {
   }
   toJSON() {
     return {
-      type: 'reference',
+      name: 'reference',
       code: this.code,
+      children: this.childNodes,
     };
   }
 }
@@ -125,11 +126,41 @@ export class XContainer extends XNode {
   }
   toJSON() {
     return {
-      type: 'container',
+      name: 'container',
       labels: this.labels,
       children: this.childNodes.map(childNode => childNode.toJSON()),
     }
   }
+}
+
+/**
+Generally, the 'name' of an XNamedContainer will be a LaTeX command, like
+'section' or 'footnote'.
+*/
+export class XNamedContainer extends XContainer {
+  constructor(childNodes: XNode[] = [], public name: string = '') { super(childNodes) }
+  toVChild(): VNode {
+    return h('div', {className: this.name},
+      this.childNodes.map(childNode => childNode.toVChild()));
+  }
+  toLaTeX(): string {
+    return t(this.name, stringifyXNodes(this.childNodes)) + this.labels.map(label => t('label', label)).join('');
+  }
+  toJSON() {
+    return objectAssign(super.toJSON(), {name: this.name});
+  }
+}
+
+export class XSection extends XNamedContainer {
+  constructor(childNodes: XNode[] = []) { super(childNodes, 'section') }
+}
+
+export class XSubsection extends XNamedContainer {
+  constructor(childNodes: XNode[] = []) { super(childNodes, 'subsection') }
+}
+
+export class XSubsubsection extends XNamedContainer {
+  constructor(childNodes: XNode[] = []) { super(childNodes, 'subsubsection') }
 }
 
 export class XExample extends XContainer {
@@ -145,59 +176,24 @@ export class XExample extends XContainer {
 \\end{exe}`;
   }
   toJSON() {
-    return objectAssign(super.toJSON(), {type: 'example'});
-  }
-}
-
-export class XSection extends XContainer {
-  toVChild(): VNode {
-    return h('span.section', {},
-      this.childNodes.map(childNode => childNode.toVChild()));
-  }
-  toLaTeX(): string {
-    return t('section', super.toLaTeX());
-  }
-  toJSON() {
-    return objectAssign(super.toJSON(), {type: 'section'});
-  }
-}
-
-export class XSubsection extends XContainer {
-  toVChild(): VNode {
-    return h('span.subsection', {},
-      this.childNodes.map(childNode => childNode.toVChild()));
-  }
-  toLaTeX(): string {
-    return t('subsection', super.toLaTeX());
-  }
-  toJSON() {
-    return objectAssign(super.toJSON(), {type: 'subsection'});
-  }
-}
-
-export class XSubsubsection extends XContainer {
-  toVChild(): VNode {
-    return h('span.subsubsection', {},
-      this.childNodes.map(childNode => childNode.toVChild()));
-  }
-  toLaTeX(): string {
-    return t('subsubsection', super.toLaTeX());
-  }
-  toJSON() {
-    return objectAssign(super.toJSON(), {type: 'subsubsection'});
+    return objectAssign(super.toJSON(), {name: 'example'});
   }
 }
 
 export class XDocument extends XContainer {
   constructor(public metadata: Map<string>, childNodes: XNode[] = []) { super(childNodes) }
+  toVChild(): VNode {
+    return h('div.document', {},
+      this.childNodes.map(childNode => childNode.toVChild()));
+  }
   toJSON() {
-    return objectAssign(super.toJSON(), {type: 'document'});
+    return objectAssign(super.toJSON(), {name: 'document'});
   }
 }
 
 export class XFootnote extends XContainer {
   toVChild(): VNode {
-    return h('span.footnote', {},
+    return h('div.footnote', {},
       this.childNodes.map(childNode => childNode.toVChild()));
   }
   toLaTeX(): string {
@@ -207,13 +203,13 @@ export class XFootnote extends XContainer {
     return t('footnote', contents);
   }
   toJSON() {
-    return objectAssign(super.toJSON(), {type: 'footnote'});
+    return objectAssign(super.toJSON(), {name: 'footnote'});
   }
 }
 
 export class XEndnote extends XContainer {
   toVChild(): VNode {
-    return h('span.endnote', {},
+    return h('div.endnote', {},
       this.childNodes.map(childNode => childNode.toVChild()));
   }
   toLaTeX(): string {
@@ -221,6 +217,6 @@ export class XEndnote extends XContainer {
     return t('endnote', contents);
   }
   toJSON() {
-    return objectAssign(super.toJSON(), {type: 'endnote'});
+    return objectAssign(super.toJSON(), {name: 'endnote'});
   }
 }

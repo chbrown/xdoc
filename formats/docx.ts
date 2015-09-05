@@ -187,10 +187,10 @@ function readParagraph(paragraph_element: Element, context: Context, parser: Par
       // (this is kind of a hack)
       //log('reading bookmark', id, name);
 
-      if (paragraph instanceof xdom.XExample) {
-        var code = name.replace(/[^A-Z0-9-]/gi, '');
-        paragraph.labels.push(code);
-      }
+      // if (paragraph instanceof xdom.XExample) {
+      var code = name.replace(/[^A-Z0-9-]/gi, '');
+      paragraph.labels.push(code);
+      // }
     }
     else if (tag == 'bookmarkEnd') {
       // hopefully bookmarks aren't cross-nested?
