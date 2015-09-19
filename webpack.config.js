@@ -32,6 +32,11 @@ module.exports = {
         include: __dirname,
       },
       {
+        test: /\.js$/,
+        loaders: ['ng-annotate-loader?map=false'],
+        include: __dirname,
+      },
+      {
         test: /\.less$/,
         loaders: ['style-loader', 'css-loader', 'less-loader'],
       },
