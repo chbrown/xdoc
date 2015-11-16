@@ -1,17 +1,16 @@
-/// <reference path="../type_declarations/index.d.ts" />
-
 /**
 This module should be used for parsing Microsoft OpenXML documents.
 
 This is the part that needs to worry about the difference between w:p and w:r
 */
-
 import JSZip = require('jszip');
 import {Stack} from 'adts';
-import xdom = require('../xdom');
-import characters = require('../characters');
+import {pushAll, toArray} from 'tarry';
+import * as xdom from '../xdom';
+import * as characters from '../characters';
 import {log, memoize} from '../util';
-import {pushAll, toArray} from 'arrays';
+
+interface Map<V> { [index: string]: V }
 
 class ComplexField {
   /** `separated` is set to true when w:fldChar[fldCharType="separate"] is reached. */

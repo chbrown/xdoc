@@ -1,3 +1,4 @@
+var path = require('path');
 var webpack = require('webpack');
 
 var production = process.env.NODE_ENV == 'production';
@@ -9,11 +10,9 @@ var plugins = production ? [
 
 module.exports = {
   // devtool: 'source-map',
-  entry: [
-    './app'
-  ],
+  entry: ['./app'],
   output: {
-    path: './build',
+    path: path.join(__dirname, 'build'),
     filename: 'bundle.js',
   },
   plugins: plugins,
@@ -27,9 +26,10 @@ module.exports = {
   module: {
     loaders: [
       {
-        test: /\.jsx$/,
-        loaders: ['babel-loader?stage=1'],
+        test: /\.ts$/,
+        loaders: ['ts-loader'],
         include: __dirname,
+        exclude: /node_modules/,
       },
       {
         test: /\.js$/,

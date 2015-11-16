@@ -1,10 +1,9 @@
-/// <reference path="type_declarations/index.d.ts" />
 import {XDocument} from './xdom';
 
 export function plain(document: XDocument) {
   var timestamp = new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '');
   var latex = document.toLaTeX();
-return `\\documentclass{article}
+  return `\\documentclass{article}
 
 % Converted by xdoc on ${timestamp}
 
@@ -70,7 +69,7 @@ export function semprag(document: XDocument) {
 
   var abstract = 'TODO: abstract';
 
-return `\\documentclass[lucida,biblatex]{sp}
+  return `\\documentclass[lucida,biblatex]{sp}
 
 % Converted by xdoc on ${timestamp}
 

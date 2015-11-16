@@ -20,26 +20,30 @@
     "adts": "*",
     "angular": "*",
     "angular-ui-router": "0.2.13",
-    "arrays": "chbrown/arrays",
     "coders": "*",
     "flow-copy": "*",
     "jszip": "*",
     "lodash": "*",
-    "ngstorage": "gsklee/ngStorage",
+    "ngstorage": "*",
     "ng-upload": "*",
     "notify-ui": "*",
     "object-assign": "*",
+    "tarry": "*",
     "tex": "*",
     "virtual-dom": "*",
     "xmltree": "*"
   },
   "devDependencies": {
+    "babel-core": "^5.0.0",
+    "babel-loader": "^5.0.0",
     "css-loader": "*",
+    "declarations": "*",
+    "less": "*",
     "less-loader": "*",
     "mocha": "*",
     "ng-annotate-loader": "*",
     "style-loader": "*",
-    "typescript": "*",
+    "typescript": "next",
     "webpack": "*"
   }
 }

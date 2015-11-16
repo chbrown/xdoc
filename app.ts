@@ -1,7 +1,6 @@
-/// <reference path="type_declarations/index.d.ts" />
 import {base64} from 'coders';
 import JSZip = require('jszip');
-import {flatten, toArray} from 'arrays';
+import {flatten, toArray} from 'tarry';
 import {NotifyUI} from 'notify-ui';
 import {VNode, VChild, h, create, diff, patch} from 'virtual-dom';
 // import React from 'react';

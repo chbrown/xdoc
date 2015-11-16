@@ -1,11 +1,10 @@
-/// <reference path="type_declarations/index.d.ts" />
-import _ = require('lodash');
 import {VNode, VChild, VProperties, h} from 'virtual-dom';
 import {t, e, stringifyXNodes, stringifyXTexts} from './latex';
 import {log, join} from './util';
-import {pushAll, flatMap} from 'arrays';
+import {pushAll, flatMap} from 'tarry';
+import objectAssign = require('object-assign');
 
-var objectAssign = require('object-assign');
+interface Map<V> { [index: string]: V }
 
 /** We can do bitwise math in Javascript up to 2^29, so we can have up to
 29 styles.

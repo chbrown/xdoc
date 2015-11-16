@@ -1,5 +1,5 @@
 // http://en.wikibooks.org/wiki/LaTeX/Special_Characters#Escaped_codes
-import {pushAll, flatMap} from 'arrays';
+import {pushAll, flatMap} from 'tarry';
 import {Stack} from 'adts';
 
 import {escapeRegExp, isWhitespace, join} from './util';

@@ -1,19 +1,14 @@
 BIN := node_modules/.bin
-DTS := lodash/lodash jszip/jszip mocha/mocha node/node virtual-dom/virtual-dom \
-	jquery/jquery angularjs/angular react/react react/react-addons
+TYPESCRIPT := formats/docx.ts app.ts characters.ts latex.ts layouts.ts util.ts xdom.ts
+JAVASCRIPT := $(TYPESCRIPT:%.ts=%.js)
 
-all: build/bundle.js site.css
-type_declarations: $(DTS:%=type_declarations/DefinitelyTyped/%.d.ts)
-
-type_declarations/DefinitelyTyped/%:
-	mkdir -p $(@D)
-	curl -s https://raw.githubusercontent.com/borisyankov/DefinitelyTyped/master/$* > $@
+all: $(JAVASCRIPT) build/bundle.js
 
 $(BIN)/tsc $(BIN)/webpack $(BIN)/mocha:
 	npm install
 
-%.js: %.ts type_declarations $(BIN)/tsc
-	$(BIN)/tsc --experimentalDecorators -m commonjs -t ES5 $<
+%.js: %.ts $(BIN)/tsc
+	$(BIN)/tsc
 
 build/bundle.js: webpack.config.js app.js $(BIN)/webpack
 	mkdir -p $(@D)
@@ -22,5 +17,5 @@ build/bundle.js: webpack.config.js app.js $(BIN)/webpack
 dev: webpack.config.js $(BIN)/webpack
 	$(BIN)/webpack --watch --config $<
 
-test: $(BIN)/mocha
-	$(BIN)/mocha tests/
+test: $(JAVASCRIPT) $(BIN)/mocha
+	$(BIN)/mocha --compilers js:babel-core/register tests/
