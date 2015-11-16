@@ -1,7 +1,7 @@
 {
   "name": "xdoc",
   "description": "Document object manipulation",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "keywords": [
     "word",
     "docx",
