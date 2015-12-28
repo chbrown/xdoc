@@ -1,14 +1,20 @@
 BIN := node_modules/.bin
-TYPESCRIPT := formats/docx.ts app.ts characters.ts latex.ts layouts.ts util.ts xdom.ts
+TYPESCRIPT := $(shell jq -r '.files[]' tsconfig.json | grep -v node_modules)
 JAVASCRIPT := $(TYPESCRIPT:%.ts=%.js)
 
-all: $(JAVASCRIPT) build/bundle.js
+all: $(JAVASCRIPT) build/bundle.js .gitignore .npmignore
 
 $(BIN)/tsc $(BIN)/webpack $(BIN)/mocha:
 	npm install
 
 %.js: %.ts $(BIN)/tsc
 	$(BIN)/tsc
+
+.npmignore: tsconfig.json
+	echo $(TYPESCRIPT) tests/ Makefile tsconfig.json | tr ' ' '\n' > $@
+
+.gitignore: tsconfig.json
+	echo $(JAVASCRIPT) $(TYPESCRIPT:%.ts=%.d.ts) | tr ' ' '\n' > $@
 
 build/bundle.js: webpack.config.js app.js $(BIN)/webpack
 	mkdir -p $(@D)

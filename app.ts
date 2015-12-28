@@ -1,14 +1,13 @@
 import {base64} from 'coders';
 import JSZip = require('jszip');
-import {flatten, toArray} from 'tarry';
 import {NotifyUI} from 'notify-ui';
 import {VNode, VChild, h, create, diff, patch} from 'virtual-dom';
+import logger from './logger';
 // import React from 'react';
 
 var xmltree = require('xmltree/virtual-dom');
 
 import {Parser} from './formats/docx';
-import {log} from './util';
 import {XDocument} from './xdom';
 import * as layouts from './layouts';
 
@@ -114,7 +113,7 @@ app.directive('uiSrefActiveAny', function($state) {
 
 app.config(($stateProvider, $urlRouterProvider) => {
   $urlRouterProvider.otherwise(($injector, $location) => {
-    log('otherwise: coming from "%s"', $location.url());
+    logger.warning('otherwise: coming from "%s"', $location.url());
     return '/';
   });
 

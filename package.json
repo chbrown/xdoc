@@ -23,7 +23,7 @@
     "coders": "*",
     "flow-copy": "*",
     "jszip": "*",
-    "lodash": "*",
+    "loge": "*",
     "ngstorage": "*",
     "ng-upload": "*",
     "notify-ui": "*",
@@ -41,9 +41,12 @@
     "less": "*",
     "less-loader": "*",
     "mocha": "*",
-    "ng-annotate-loader": "*",
+    "ng-annotate-webpack-plugin": "*",
     "style-loader": "*",
-    "typescript": "next",
+    "typescript": "*",
     "webpack": "*"
+  },
+  "scripts": {
+    "test": "make test"
   }
 }

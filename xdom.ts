@@ -1,7 +1,6 @@
 import {VNode, VChild, VProperties, h} from 'virtual-dom';
 import {t, e, stringifyXNodes, stringifyXTexts} from './latex';
-import {log, join} from './util';
-import {pushAll, flatMap} from 'tarry';
+import {join} from './util';
 import objectAssign = require('object-assign');
 
 interface Map<V> { [index: string]: V }
@@ -111,7 +110,7 @@ export class XContainer extends XNode {
     this.childNodes.push(newChild);
   }
   appendChildren(newChildren: XNode[]) {
-    pushAll(this.childNodes, newChildren);
+    this.childNodes.push(...newChildren);
   }
 
   toVChild(): VNode {

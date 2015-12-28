@@ -1,5 +1,3 @@
-export const log = console.log.bind(console);
-
 /** from MDN */
 export function escapeRegExp(raw: string): string {
   return raw.replace(/([.*+?^=!:${}()|[\]\/\\])/g, '\\$1');

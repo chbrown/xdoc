@@ -5,10 +5,10 @@ This is the part that needs to worry about the difference between w:p and w:r
 */
 import JSZip = require('jszip');
 import {Stack} from 'adts';
-import {pushAll, toArray} from 'tarry';
 import * as xdom from '../xdom';
-import * as characters from '../characters';
-import {log, memoize} from '../util';
+import {symbol, wingdings} from '../characters';
+import {memoize} from '../util';
+import logger from '../logger';
 
 interface Map<V> { [index: string]: V }
 
@@ -22,7 +22,8 @@ class ComplexField {
 }
 
 function childElements(node: Node): Element[] {
-  var children = toArray(node.childNodes).filter(childNode => childNode.nodeType == Node.ELEMENT_NODE);
+  var children = Array.from(node.childNodes)
+    .filter(childNode => childNode.nodeType == Node.ELEMENT_NODE);
   return <Element[]>children;
 }
 
@@ -82,7 +83,7 @@ function readPropertiesStyles(properties: Element): number {
       styles |= xdom.Style.Superscript;
     }
     else {
-      // log(`Ignoring ${properties.tagName} > ${child.tagName}[val=${val}]`);
+      // logger.warning(`Ignoring ${properties.tagName} > ${child.tagName}[val=${val}]`);
     }
   });
   return styles;
@@ -98,7 +99,7 @@ body will most often be a <w:body> element, but may also be a
 The returned node's .childNodes will be xdom.XParagraph objects.
 */
 function readBody(body: Element, context: Context, parser: Parser): xdom.XContainer[] {
-  var childNodes = toArray(body.childNodes)
+  var childNodes = Array.from(body.childNodes)
     .filter(childNode => childNode.nodeType == Node.ELEMENT_NODE)
     .map((element: Element) => readParagraph(element, context, parser));
   return childNodes;
@@ -136,7 +137,7 @@ function readParagraph(paragraph_element: Element, context: Context, parser: Par
           paragraph = new xdom.XSubsubsection(paragraph.childNodes);
         }
         else {
-          log('ignoring pPr > pStyle', pStyle_val);
+          logger.warning('ignoring pPr > pStyle', pStyle_val);
         }
       }
     }
@@ -146,7 +147,7 @@ function readParagraph(paragraph_element: Element, context: Context, parser: Par
       // if we are within a complex field stack, we append to that rather than the current paragraph
       if (context.complexFieldStack.top) {
         // by the time we get to runs inside a complexField, `context.complexFieldStack.top.separated` should be true
-        pushAll(context.complexFieldStack.top.childNodes, nodes);
+        context.complexFieldStack.top.childNodes.push(...nodes);
       }
       else {
         paragraph.appendChildren(nodes);
@@ -184,7 +185,7 @@ function readParagraph(paragraph_element: Element, context: Context, parser: Par
       // for now, I'm just going to assume that labels apply only to the
       // paragraph in which they start, and that they apply to the whole paragraph
       // (this is kind of a hack)
-      //log('reading bookmark', id, name);
+      //logger.info('reading bookmark', id, name);
 
       // if (paragraph instanceof xdom.XExample) {
       var code = name.replace(/[^A-Z0-9-]/gi, '');
@@ -195,7 +196,7 @@ function readParagraph(paragraph_element: Element, context: Context, parser: Par
       // hopefully bookmarks aren't cross-nested?
     }
     else {
-      log('p > %s ignored', tag);
+      logger.warning('p > %s ignored', tag);
     }
   });
 
@@ -225,13 +226,13 @@ function readRun(run: Element, context: Context, parser: Parser): xdom.XNode[] {
     }
     else if (tag == 'footnoteReference') {
       var footnote_id = child.getAttribute('w:id');
-      // log('r > footnoteReference #%s', footnote_id);
+      // logger.info('r > footnoteReference #%s', footnote_id);
       var footnote_node = parser.footnotes[footnote_id];
       nodes.push(footnote_node);
     }
     else if (tag == 'endnoteReference') {
       var endnote_id = child.getAttribute('w:id');
-      // log('r > endnoteReference #%s', endnote_id);
+      // logger.info('r > endnoteReference #%s', endnote_id);
       var endnote_node = parser.endnotes[endnote_id];
       nodes.push(endnote_node);
     }
@@ -243,14 +244,14 @@ function readRun(run: Element, context: Context, parser: Parser): xdom.XNode[] {
 
       var text = '';
 
-      if (font == 'Symbol' && char_code in characters.symbol) {
-        text = characters.symbol[char_code];
+      if (font == 'Symbol' && char_code in symbol) {
+        text = symbol[char_code];
       }
-      else if (font == 'Wingdings' && char_code in characters.wingdings) {
-        text = characters.wingdings[char_code];
+      else if (font == 'Wingdings' && char_code in wingdings) {
+        text = wingdings[char_code];
       }
       else {
-        log('r > sym: %s', shifted_char_code, font);
+        logger.info(`r > sym: ${shifted_char_code}`, font);
         // logger.critical('Could not find symbol in map: %r' % char)
         // replacement = u'MISSING SYMBOL (%r)' % char
         text = shifted_char_code; // symbol_map.get(sym_char)
@@ -275,12 +276,12 @@ function readRun(run: Element, context: Context, parser: Parser): xdom.XNode[] {
       // counters look like this:
       // ' LISTNUM  ' or ' LISTNUM Example ' but I think they refer to the same thing
       // I'm not sure what the ' \* MERGEFORMAT ' instructions are for
-      // log('r > instrText:', child);
+      // logger.info('r > instrText:', child);
 
       var text = child.textContent;
       var hyperlink_match = text.match(/ HYPERLINK "(.+)" \\t ".+"/);
       if (hyperlink_match) {
-        log('Ignoring r > instrText hyperlink: "%s"', hyperlink_match[1]);
+        logger.warning('Ignoring r > instrText hyperlink: "%s"', hyperlink_match[1]);
         // context.addStyles(['hyperlink', 'url=' + hyperlink_match[1]]);
       }
 
@@ -288,7 +289,7 @@ function readRun(run: Element, context: Context, parser: Parser): xdom.XNode[] {
       if (ref_match) {
         var ref = ref_match[1];
         var flags = ref_match[2];
-        // log(`Setting complex field code to "${ref}" (ignoring flags: ${flags})`);
+        // logger.info(`Setting complex field code to "${ref}" (ignoring flags: ${flags})`);
         // `context.complexFieldStateStack.top` should not be undefined, and
         // `context.complexFieldStateStack.top.separated` should be false
         context.complexFieldStack.top.code = ref;
@@ -296,7 +297,7 @@ function readRun(run: Element, context: Context, parser: Parser): xdom.XNode[] {
 
       var counter_match = text.match(/ LISTNUM (.*) $/);
       if (counter_match) {
-        log('Ignoring r > instrText counter: "%s"', counter_match[1]);
+        logger.info('Ignoring r > instrText counter: "%s"', counter_match[1]);
         // context.addStyles(['counter', 'series=' + counter_match[1]]);
       }
     }
@@ -306,15 +307,15 @@ function readRun(run: Element, context: Context, parser: Parser): xdom.XNode[] {
       // current displayed value is specified between the 'separate' and 'end' types.
       var field_signal = child.getAttribute('w:fldCharType');
       if (field_signal == 'begin') {
-        // log('r > fldChar: fldCharType=begin');
+        // logger.debug('r > fldChar: fldCharType=begin');
         context.complexFieldStack.push(new ComplexField());
       }
       else if (field_signal == 'separate') {
-        // log('r > fldChar: fldCharType=separate');
+        // logger.debug('r > fldChar: fldCharType=separate');
         context.complexFieldStack.top.separated = true;
       }
       else if (field_signal == 'end') {
-        // log('r > fldChar: fldCharType=end');
+        // logger.debug('r > fldChar: fldCharType=end');
         var complexField = context.complexFieldStack.pop();
         if (complexField) {
           var field_node: xdom.XNode = new xdom.XContainer(complexField.childNodes);
@@ -325,7 +326,7 @@ function readRun(run: Element, context: Context, parser: Parser): xdom.XNode[] {
           nodes.push(field_node);
         }
         else {
-          log(`Empty complexField encountered at:`, child);
+          logger.debug(`Empty complexField encountered at:`, child);
         }
         // var change = child.find('{*}numberingChange');
         // var span;
@@ -333,7 +334,7 @@ function readRun(run: Element, context: Context, parser: Parser): xdom.XNode[] {
         //   var original = change.getAttribute('w:original');
         //   span = new Span(original, S.union([r_styles, p_styles]), p_attrs);
         // }
-        // log('Found fldCharType=end; reverting p_styles and p_attrs');
+        // logger.debug('Found fldCharType=end; reverting p_styles and p_attrs');
       }
       else {
         throw new Error(`r > fldChar: Unrecognized fldCharType: ${field_signal}`);
@@ -364,13 +365,13 @@ function readRun(run: Element, context: Context, parser: Parser): xdom.XNode[] {
       // um, just ignore for now
     }
     else {
-      log('r > %s ignored', tag); // , child
+      logger.warning('r > %s ignored', tag); // , child
     }
   });
   context.stylesStack.pop();
 
   if (nodes.length > 1) {
-    log('readRun returning %d nodes', nodes.length, nodes);
+    logger.warning('readRun returning %d nodes', nodes.length, nodes);
   }
 
   return nodes;
