@@ -1,5 +1,5 @@
 BIN := node_modules/.bin
-TYPESCRIPT := $(shell jq -r '.files[]' tsconfig.json | grep -v node_modules)
+TYPESCRIPT := $(shell jq -r '.files[]' tsconfig.json | grep -Fv .d.ts)
 JAVASCRIPT := $(TYPESCRIPT:%.ts=%.js)
 
 all: $(JAVASCRIPT) build/bundle.js .gitignore .npmignore
