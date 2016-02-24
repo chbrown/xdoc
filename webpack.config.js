@@ -1,17 +1,8 @@
 var path = require('path');
 var webpack = require('webpack');
-
 var ngAnnotatePlugin = require('ng-annotate-webpack-plugin');
 
 var production = process.env.NODE_ENV == 'production';
-
-var plugins = production ? [
-  new ngAnnotatePlugin({add: true}),
-  new webpack.optimize.UglifyJsPlugin(),
-  new webpack.optimize.OccurenceOrderPlugin(),
-] : [
-  new ngAnnotatePlugin({add: true}),
-];
 
 module.exports = {
   // devtool: 'source-map',
@@ -20,7 +11,12 @@ module.exports = {
     path: path.join(__dirname, 'build'),
     filename: 'bundle.js',
   },
-  plugins: plugins,
+  plugins: [new ngAnnotatePlugin({add: true})].concat(
+    production ? [
+      new webpack.optimize.UglifyJsPlugin(),
+      new webpack.optimize.OccurenceOrderPlugin(),
+    ] : []
+  ),
   resolve: {
     extensions: [
       '',
