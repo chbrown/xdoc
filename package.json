@@ -27,7 +27,6 @@
     "ngstorage": "*",
     "ng-upload": "*",
     "notify-ui": "*",
-    "object-assign": "*",
     "tarry": "*",
     "tex": "*",
     "virtual-dom": "*",

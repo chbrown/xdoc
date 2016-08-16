@@ -1,8 +1,8 @@
 import {XDocument} from './xdom';
 
 export function plain(document: XDocument) {
-  var timestamp = new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '');
-  var latex = document.toLaTeX();
+  const timestamp = new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '');
+  const latex = document.toLaTeX();
   return `\\documentclass{article}
 
 % Converted by xdoc on ${timestamp}
@@ -38,26 +38,26 @@ interface Author {
 }
 
 export function semprag(document: XDocument) {
-  var timestamp = new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '');
-  var latex = document.toLaTeX();
+  const timestamp = new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '');
+  const latex = document.toLaTeX();
   // extract metadata fields
-  var title = document.metadata['title'];
-  var short_title = document.metadata['title'].split(':')[0];
-  var keywords = document.metadata['keywords'];
-  var thanks = 'TODO: Thanks';
-  var authors: Author[] = [{
+  const title = document.metadata['title'];
+  const short_title = document.metadata['title'].split(':')[0];
+  const keywords = document.metadata['keywords'];
+  const thanks = 'TODO: Thanks';
+  const authors: Author[] = [{
     name: document.metadata['creator'],
     institute: 'TODO: institute',
     department: 'TODO: department',
     address: 'TODO: address',
     email: 'TODO: email',
   }];
-  var author_names = authors.map(author => author.name);
-  var sp_authors = authors.map(author => {
+  const author_names = authors.map(author => author.name);
+  const sp_authors = authors.map(author => {
     return `\\spauthor{${author.name} \\\\ \\institute{${author.institute}}}`;
   });
 
-  var addresses = authors.map(author => {
+  const addresses = authors.map(author => {
     return `  \\begin{address}
     ${author.name} \\\\
     ${author.department} \\\\
@@ -67,7 +67,7 @@ export function semprag(document: XDocument) {
   \\end{address}`;
   });
 
-  var abstract = 'TODO: abstract';
+  const abstract = 'TODO: abstract';
 
   return `\\documentclass[lucida,biblatex]{sp}
 

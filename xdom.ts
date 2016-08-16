@@ -1,7 +1,6 @@
 import {VNode, VChild, VProperties, h} from 'virtual-dom';
 import {t, e, stringifyXNodes, stringifyXTexts} from './latex';
 import {join} from './util';
-import objectAssign = require('object-assign');
 
 interface Map<V> { [index: string]: V }
 
@@ -114,7 +113,7 @@ export class XContainer extends XNode {
   }
 
   toVChild(): VNode {
-    // var properties = {};
+    // const properties = {};
     // properties['title'] = `labels=${this.labels.join(',')}`;
     return h('div.container', {},
       this.childNodes.map(childNode => childNode.toVChild()));
@@ -145,7 +144,7 @@ export class XNamedContainer extends XContainer {
     return t(this.name, stringifyXNodes(this.childNodes)) + this.labels.map(label => t('label', label)).join('');
   }
   toJSON() {
-    return objectAssign(super.toJSON(), {name: this.name});
+    return Object.assign(super.toJSON(), {name: this.name});
   }
 }
 
@@ -163,18 +162,18 @@ export class XSubsubsection extends XNamedContainer {
 
 export class XExample extends XContainer {
   toVChild(): VNode {
-    var node = super.toVChild();
+    const node = super.toVChild();
     node.properties['className'] += ' example';
     return node;
   }
   toLaTeX(): string {
-    var content = super.toLaTeX();
+    const content = super.toLaTeX();
     return `\\begin{exe}
   \\ex ${content}
 \\end{exe}`;
   }
   toJSON() {
-    return objectAssign(super.toJSON(), {name: 'example'});
+    return Object.assign(super.toJSON(), {name: 'example'});
   }
 }
 
@@ -185,7 +184,7 @@ export class XDocument extends XContainer {
       this.childNodes.map(childNode => childNode.toVChild()));
   }
   toJSON() {
-    return objectAssign(super.toJSON(), {name: 'document'});
+    return Object.assign(super.toJSON(), {name: 'document'});
   }
 }
 
@@ -197,11 +196,11 @@ export class XFootnote extends XContainer {
   toLaTeX(): string {
     // a lot of people like to add space in front of all their footnotes.
     // this is kind of a hack to remove it.
-    var contents = super.toLaTeX().replace(/^\s+/, '');
+    const contents = super.toLaTeX().replace(/^\s+/, '');
     return t('footnote', contents);
   }
   toJSON() {
-    return objectAssign(super.toJSON(), {name: 'footnote'});
+    return Object.assign(super.toJSON(), {name: 'footnote'});
   }
 }
 
@@ -211,10 +210,10 @@ export class XEndnote extends XContainer {
       this.childNodes.map(childNode => childNode.toVChild()));
   }
   toLaTeX(): string {
-    var contents = super.toLaTeX().replace(/^\s+/, '');
+    const contents = super.toLaTeX().replace(/^\s+/, '');
     return t('endnote', contents);
   }
   toJSON() {
-    return objectAssign(super.toJSON(), {name: 'endnote'});
+    return Object.assign(super.toJSON(), {name: 'endnote'});
   }
 }

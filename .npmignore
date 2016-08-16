@@ -1,10 +1,8 @@
-shims.d.ts
 formats/docx.ts
 app.ts
 characters.ts
 latex.ts
 layouts.ts
-logger.ts
 util.ts
 xdom.ts
 tests/
