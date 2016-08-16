@@ -120,32 +120,179 @@ app.config(($stateProvider, $urlRouterProvider) => {
   $stateProvider
   .state('documents', {
     url: '/',
-    templateUrl: 'templates/documents.html',
+    template: `
+      <section class="hpad">
+        <h1><code>xdoc</code>: a Word-to-LaTeX converter.</h1>
+        <h3>Instructions:</h3>
+        <ol>
+          <li>Load a Word document file using the input below. This file is only
+            available to your browser; it is not uploaded to any server.</li>
+          <li>Preview the automatically generated <code>xdoc</code> representation
+            of your document using the "XDoc" link.</li>
+          <li>Generate a LaTeX representation via the "LaTeX" link. Copy and paste the
+            contents of that page into a file on your computer, and render it with
+            <code>pdflatex</code>.</li>
+        </ol>
+        <p>Only modern Word documents (those with a <code>.docx</code> extension) are supported.</p>
+      </section>
+
+      <section class="hpad">
+        <h2>Stored documents</h2>
+        <p ng-show="storedFiles.length == 0">
+          You have not loaded any files. A list of loaded files will appear here after you have uploaded one.
+        </p>
+      </section>
+      <table ng-show="storedFiles.length > 0" class="fill padded lined striped">
+        <thead>
+          <tr>
+            <th title="File name">Name</th>
+            <th></th>
+            <th></th>
+            <th title="Original file contents size">Size</th>
+            <!-- <th title="MIME Type">Type</th> -->
+            <th title="Last modified date">Modified</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr ng-repeat="storedFile in storedFiles">
+            <td><a ui-sref="document.files({name: storedFile.name})">{{storedFile.name}}</a></td>
+            <td><a ui-sref="document.xdoc({name: storedFile.name})">XDoc</a></td>
+            <td><a ui-sref="document.latex({name: storedFile.name})">LaTeX</a></td>
+            <!-- the storedFile.base64 getter should not trigger a base64 conversion -->
+            <td class="number" title="Base64 string length: {{storedFile.base64.length}}">{{storedFile.size}}</td>
+            <!-- <td>{{storedFile.type}}</td> -->
+            <td>{{storedFile.lastModifiedDate | date:'MMMM d, y h:mm a'}}</td>
+            <td><button ng-click="removeStoredFile(storedFile)">Remove</button>
+          </tr>
+        </tbody>
+      </table>
+
+      <section class="hpad">
+        <form>
+          <label>
+            <div><b>Load a new Word Document</b></div>
+            <input type="file" ng-upload="readFile($file)">
+          </label>
+        </form>
+      </section>
+    `,
     controller: 'documentsCtrl',
   })
   .state('document', {
     url: '/:name',
-    templateUrl: 'templates/document.html',
+    template: `
+      <nav fixedflow class="sub">
+        <span class="text">
+          <b>{{storedFile.name}}</b>
+        </span>
+        <span ui-sref-active="current" class="tab">
+          <a ui-sref="document.files">Files</a>
+        </span>
+        <span ui-sref-active="current" class="tab">
+          <a ui-sref="document.xdoc">XDoc</a>
+        </span>
+        <!-- <span ui-sref-active="current" class="tab">
+          <a ui-sref="validate">Validate</a>
+        </span> -->
+        <span ui-sref-active="current" class="tab">
+          <a ui-sref="document.latex">LaTeX</a>
+        </span>
+      </nav>
+
+      <ui-view></ui-view>
+    `,
     controller: 'documentCtrl',
     abstract: true,
   })
   .state('document.files', {
     url: '/files',
-    templateUrl: 'templates/files.html',
+    template: `
+      <section class="hpad">
+        <h3>Document zip archive contents</h3>
+        <p>You can use this file to view the raw XML for all files inside the Word document.</p>
+        <p>This is helpful for developing and debugging, but if you just want to convert your document, use the <a ui-sref="document.latex">LaTeX</a> link.
+      </section>
+
+      <table class="fill padded lined striped">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Dir</th>
+            <th>Date</th>
+            <th>Comment</th>
+            <th>Permissions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr ng-repeat="object in zip.files">
+            <td><a ui-sref="document.files.xml({filepath: object.name})">{{object.name}}</a></td>
+            <td>{{object.dir}}</td>
+            <td>{{object.date}}</td>
+            <td>{{object.comment}}</td>
+            <td>{{object.unixPermissions || object.dosPermissions}}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <ui-view></ui-view>
+    `,
   })
   .state('document.files.xml', {
     url: '/:filepath/xml',
-    templateUrl: 'templates/xml.html',
+    template: `
+      <section class="hpad">
+        <h4>Legend</h4>
+        <ul class="xml">
+          <li class="attribute">
+            Attribute
+            <ul class="attribute">
+              <li class="name">Name</li>
+              <li class="value">Value</li>
+            </ul>
+          </li>
+          <li class="start">Start Tag</li>
+          <li class="end">End Tag</li>
+          <li class="text" style="margin: 0">Text</li>
+        </ul>
+
+        <h3>File: {{file.name}}</h3>
+        <xml-tree xml="text" class="xml"></xml-tree>
+      </section>
+    `,
     controller: 'documentFileXmlCtrl',
   })
   .state('document.xdoc', {
     url: '/xdoc',
-    templateUrl: 'templates/xdoc.html',
+    template: `
+      <section class="hpad">
+        <h2>Metadata</h2>
+        <ul>
+          <li ng-repeat="(key, value) in document.metadata">{{key}}: {{value}}</li>
+        </ul>
+      </section>
+
+      <section class="hpad">
+        <h2>Document</h2>
+
+        <div>
+          <label><input type="checkbox" ng-model="$storage.outlined"> Show outlines around each span</label>
+        </div>
+
+        <div class="document" ng-class="{outlined: $storage.outlined}" xdom-document="document"></div>
+      </section>
+    `,
     controller: 'documentXDocCtrl',
   })
   .state('document.xdocjson', {
     url: '/xdocjson',
-    templateUrl: 'templates/xdocjson.html',
+    template: `
+      <section class="hpad">
+        <h2>Document</h2>
+
+        <pre ng-bind="document | json:'  '"></pre>
+      </section>
+    `,
     controller: 'documentXDocJSONCtrl',
   })
   // .state('validate', {
@@ -154,7 +301,20 @@ app.config(($stateProvider, $urlRouterProvider) => {
   // });
   .state('document.latex', {
     url: '/latex',
-    templateUrl: 'templates/latex.html',
+    template: `
+      <section class="hpad">
+        <label>
+          <b>Layout</b>
+          <select ng-model="$storage.layout"
+            ng-options="layout as layout for (layout, layoutFunction) in layouts"></select>
+        </label>
+        <a download="paper.tex">Download .tex</a>
+      </section>
+
+      <section class="hpad">
+        <div class="latex" ng-bind="latex"></div>
+      </section>
+    `,
     controller: 'documentLaTeXCtrl',
   });
 });
