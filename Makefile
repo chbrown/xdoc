@@ -16,8 +16,8 @@ $(BIN)/tsc $(BIN)/webpack $(BIN)/mocha:
 .gitignore: tsconfig.json
 	echo $(JAVASCRIPT) $(TYPESCRIPT:%.ts=%.d.ts) | tr ' ' '\n' > $@
 
-build/bundle.js: webpack.config.js app.js $(BIN)/webpack
-	mkdir -p $(@D)
+build/bundle.js: webpack.config.js $(JAVASCRIPT) $(BIN)/webpack
+	@mkdir -p $(@D)
 	NODE_ENV=production $(BIN)/webpack --config $<
 
 dev: webpack.config.js $(BIN)/webpack
