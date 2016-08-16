@@ -11,31 +11,18 @@ module.exports = {
     path: path.join(__dirname, 'build'),
     filename: 'bundle.js',
   },
-  plugins: [new ngAnnotatePlugin({add: true})].concat(
-    production ? [
+  plugins: [
+    new ngAnnotatePlugin({add: true}),
+    ...(production ? [
       new webpack.optimize.UglifyJsPlugin(),
       new webpack.optimize.OccurenceOrderPlugin(),
-    ] : []
-  ),
-  resolve: {
-    extensions: [
-      '',
-      '.js',
-      '.jsx',
-    ],
-  },
+    ] : []),
+  ],
   module: {
     loaders: [
       {
-        test: /\.ts$/,
-        loaders: ['babel-loader', 'ts-loader'],
-        include: __dirname,
-        exclude: /node_modules/,
-      },
-      {
         test: /\.js$/,
         loaders: ['babel-loader'],
-        include: __dirname,
         exclude: /node_modules/,
       },
       {

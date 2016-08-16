@@ -21,7 +21,10 @@ build/bundle.js: webpack.config.js app.js $(BIN)/webpack
 	NODE_ENV=production $(BIN)/webpack --config $<
 
 dev: webpack.config.js $(BIN)/webpack
-	$(BIN)/webpack --watch --config $<
+	(\
+   $(BIN)/webpack --watch --config $< & \
+   $(BIN)/tsc --watch & \
+   wait)
 
 test: $(JAVASCRIPT) $(BIN)/mocha
 	$(BIN)/mocha --compilers js:babel-core/register tests/
