@@ -18,11 +18,11 @@
   "license": "MIT",
   "dependencies": {
     "adts": "*",
-    "angular": "*",
+    "angular": "^1.5.8",
     "angular-ui-router": "0.2.13",
     "coders": "*",
     "flow-copy": "*",
-    "jszip": "*",
+    "jszip": "^2.6.1",
     "loge": "*",
     "ngstorage": "*",
     "ng-upload": "*",
@@ -34,8 +34,9 @@
     "xmltree": "*"
   },
   "devDependencies": {
-    "babel-core": "^5.0.0",
-    "babel-loader": "^5.0.0",
+    "babel-core": "*",
+    "babel-loader": "*",
+    "babel-preset-es2015": "*",
     "css-loader": "*",
     "declarations": "*",
     "less": "*",
