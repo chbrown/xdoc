@@ -110,7 +110,7 @@ export const replacements = {
   '–': '--', // n-dash
   '∞': '$\\infty$', // n-dash
   '☐': '$\\square$',
-  '\xa0': '\\ ', // non-breaking space
+  '\xa0': '~', // non-breaking space
   // ligatures
   'ﬁ': 'fi',
 
@@ -128,25 +128,6 @@ export const replacements = {
 };
 
 export const replacementRegExp = new RegExp(Object.keys(replacements).map(escapeRegExp).join('|'), 'g');
-
-const latex_diacritic_commands = {
-  // grave is this direction: \
-  // acute is this direction: /
-  grave: '`',
-  acute: "'",
-  circumflex: "^",
-  tilde: '~',
-  umlaut: '"',
-  ring: 'r',
-  cedilla: 'c',
-  hacek: 'v',
-  breve: 'u',
-  dotover: '.',
-  dotunder: 'd',
-  bar: 'b',
-  macron: '=',
-  ogonek: 'k',
-};
 
 function applyReplacements(raw: string): string {
   return raw.replace(replacementRegExp, match => replacements[match]);
@@ -192,7 +173,7 @@ function getStyleCommand(style: number): string {
 }
 
 export function stringifyXNodes(nodes: XNode[]): string {
-  // first step is to loop through the nodes, grouping contiguous XText nodes into `xTexts_buffer`
+  // first step is to loop through the nodes, grouping contiguous XText nodes into `xTextContainer`
   const grouped_nodes: XNode[] = [];
   nodes.forEach(node => {
     if (node instanceof XText) {
@@ -226,7 +207,15 @@ export function stringifyXNodes(nodes: XNode[]): string {
 class TeXString {
   constructor(private data: string) { }
   toString(): string {
-    return applyReplacements(this.data);
+    let tex = applyReplacements(this.data);
+    // apply other custom fixes:
+    // 1. replace sequences of underscores with a single underlined space
+    tex = tex.replace(/_+/g, match => {
+      // interpret each underscore as 3pt long
+      const pt = match.length * 3;
+      return `\\underline{\\hspace{${pt}pt}}`;
+    });
+    return tex;
   }
 }
 
