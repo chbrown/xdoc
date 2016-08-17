@@ -1,5 +1,5 @@
 import {base64} from 'coders';
-import JSZip = require('jszip');
+import * as JSZip from 'jszip';
 import {NotifyUI} from 'notify-ui';
 import {VNode, VChild, h, create, diff, patch} from 'virtual-dom';
 // import React from 'react';

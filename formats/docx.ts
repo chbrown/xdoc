@@ -3,7 +3,7 @@ This module should be used for parsing Microsoft OpenXML documents.
 
 This is the part that needs to worry about the difference between w:p and w:r
 */
-import JSZip = require('jszip');
+import * as JSZip from 'jszip';
 import {Stack} from 'adts';
 import * as xdom from '../xdom';
 import {symbol, wingdings} from '../characters';
