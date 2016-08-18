@@ -385,7 +385,8 @@ class Context {
 }
 
 export class Parser {
-  constructor(arraybuffer: ArrayBuffer, public zip = new JSZip(arraybuffer)) { }
+  constructor(arraybuffer: ArrayBuffer,
+              public zip = new JSZip(arraybuffer)) { }
 
   get document() {
     // the root element of the word/document.xml document is a w:document, which

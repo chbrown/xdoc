@@ -7,6 +7,19 @@ export function isWhitespace(data: string): boolean {
   return /^\s+$/.test(data);
 }
 
+export function isText(node: Node): node is Text {
+  return node.nodeType === Node.TEXT_NODE;
+}
+export function isElement(node: Node): node is Element {
+  return node.nodeType === Node.ELEMENT_NODE;
+}
+export function isAttr(node: Node): node is Attr {
+  return node.nodeType === Node.ATTRIBUTE_NODE;
+}
+export function isCDATASection(node: Node): node is CDATASection {
+  return node.nodeType === Node.CDATA_SECTION_NODE;
+}
+
 /**
 Search the codebase for @util.memoize or @memoize for usage examples.
 */
@@ -33,7 +46,7 @@ export function join<T>(items: T[],
                         stringFn: (item: T) => string,
                         separatorFn: (left: T, right: T) => string): string {
   const length = items.length;
-  // empty arrays require the Math.min(..., 0) below as a special case to avoid
+  // empty arrays require the Math.max(..., 0) below as a special case to avoid
   // trying to create an Array with length -1
   const strings: string[] = new Array(Math.max(length + length - 1, 0));
   for (let i = 0; i < length; i++) {

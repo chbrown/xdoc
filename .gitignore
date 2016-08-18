@@ -1,3 +1,6 @@
+components/DateTime.js
+components/FixedNav.js
+components/XNode.js
 formats/docx.js
 app.js
 characters.js
@@ -5,6 +8,9 @@ latex.js
 layouts.js
 util.js
 xdom.js
+components/DateTime.d.ts
+components/FixedNav.d.ts
+components/XNode.d.ts
 formats/docx.d.ts
 app.d.ts
 characters.d.ts

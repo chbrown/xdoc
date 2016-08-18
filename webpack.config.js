@@ -1,22 +1,24 @@
-var path = require('path');
-var webpack = require('webpack');
-var ngAnnotatePlugin = require('ng-annotate-webpack-plugin');
+const path = require('path');
+const webpack = require('webpack');
 
-var production = process.env.NODE_ENV == 'production';
+const env = process.env.NODE_ENV || 'development';
 
 module.exports = {
-  // devtool: 'source-map',
-  entry: ['./app'],
+  entry: './app',
   output: {
     path: path.join(__dirname, 'build'),
     filename: 'bundle.js',
   },
   plugins: [
-    new ngAnnotatePlugin({add: true}),
-    ...(production ? [
+    new webpack.DefinePlugin({
+      'process.env.NODE_ENV': JSON.stringify(env),
+    }),
+    new webpack.optimize.OccurenceOrderPlugin(),
+    ...(env === 'production' ? [
       new webpack.optimize.UglifyJsPlugin(),
-      new webpack.optimize.OccurenceOrderPlugin(),
-    ] : []),
+    ] : [
+      new webpack.NoErrorsPlugin(),
+    ]),
   ],
   module: {
     loaders: [
@@ -28,6 +30,10 @@ module.exports = {
       {
         test: /\.less$/,
         loaders: ['style-loader', 'css-loader', 'less-loader'],
+      },
+      {
+        test: /\.json$/,
+        loaders: ['json-loader'],
       },
     ],
   },

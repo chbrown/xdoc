@@ -1,17 +1,22 @@
 {
   "compilerOptions": {
+    "experimentalDecorators": true,
+    "jsx": "react",
     "module": "commonjs",
-    "target": "ES6",
-    "experimentalDecorators": true
+    "target": "ES6"
   },
   "files": [
-    "node_modules/declarations/angularjs/angular.d.ts",
     "node_modules/declarations/jszip/jszip.d.ts",
     "node_modules/declarations/react/react.d.ts",
-    "node_modules/declarations/virtual-dom/virtual-dom.d.ts",
+    "node_modules/declarations/react/react-dom.d.ts",
+    "node_modules/declarations/react-router/history.d.ts",
+    "node_modules/declarations/react-router/react-router.d.ts",
     "shims.d.ts",
+    "components/DateTime.tsx",
+    "components/FixedNav.tsx",
+    "components/XNode.tsx",
     "formats/docx.ts",
-    "app.ts",
+    "app.tsx",
     "characters.ts",
     "latex.ts",
     "layouts.ts",

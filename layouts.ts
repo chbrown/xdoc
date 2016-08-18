@@ -1,8 +1,9 @@
 import {XDocument} from './xdom';
+import {renderXNode} from './latex';
 
 export function plain(document: XDocument) {
   const timestamp = new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '');
-  const latex = document.toLaTeX();
+  const latex = renderXNode(document);
   return `\\documentclass{article}
 
 % Converted by xdoc on ${timestamp}
@@ -39,7 +40,7 @@ interface Author {
 
 export function semprag(document: XDocument) {
   const timestamp = new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '');
-  const latex = document.toLaTeX();
+  const latex = renderXNode(document);
   // extract metadata fields
   const title = document.metadata['title'];
   const short_title = document.metadata['title'].split(':')[0];

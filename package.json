@@ -18,18 +18,14 @@
   "license": "MIT",
   "dependencies": {
     "adts": "*",
-    "angular": "^1.5.8",
-    "angular-ui-router": "0.2.13",
     "coders": "*",
-    "flow-copy": "*",
     "jszip": "^2.6.1",
     "loge": "*",
-    "ngstorage": "*",
-    "ng-upload": "*",
-    "notify-ui": "*",
+    "react": "*",
+    "react-dom": "*",
+    "react-router": "*",
     "tarry": "*",
     "tex": "*",
-    "virtual-dom": "*",
     "xmltree": "*"
   },
   "devDependencies": {
@@ -38,10 +34,10 @@
     "babel-preset-es2015": "*",
     "css-loader": "*",
     "declarations": "*",
+    "json-loader": "*",
     "less": "*",
     "less-loader": "*",
     "mocha": "*",
-    "ng-annotate-webpack-plugin": "*",
     "style-loader": "*",
     "typescript": "*",
     "webpack": "*"

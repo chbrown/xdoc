@@ -3,9 +3,10 @@ import {flatMap} from 'tarry';
 import {Stack} from 'adts';
 
 import {escapeRegExp, isWhitespace, join} from './util';
-import {Style, XNode, XText, XTextContainer, XContainer} from './xdom';
+import * as xdom from './xdom';
+// import {Style, XNode, XText, XTextContainer, XContainer} from './xdom';
 
-export const replacements = {
+const replacements = {
   // these need to be first!
   '\\': '\\backslash{}',
   '{': '\\{',
@@ -127,23 +128,23 @@ export const replacements = {
   '\u200e': '', // U+200E LEFT-TO-RIGHT MARK
 };
 
-export const replacementRegExp = new RegExp(Object.keys(replacements).map(escapeRegExp).join('|'), 'g');
+const replacementRegExp = new RegExp(Object.keys(replacements).map(escapeRegExp).join('|'), 'g');
 
 function applyReplacements(raw: string): string {
   return raw.replace(replacementRegExp, match => replacements[match]);
 }
 
-export function t(command: string, content: string): string {
+function t(command: string, content: string): string {
   return `\\${command}{${content}}`;
 }
 
-export function e(environment: string, content: string): string {
+function e(environment: string, content: string): string {
   return `\\begin{${environment}}
   ${content}
 \\end{${environment}}`;
 }
 
-export function calculateFlags(x: number): number[] {
+function calculateFlags(x: number): number[] {
   const flags: number[] = [];
   // this could probably be smarter
   for (let power = 0; power < 29; power++) {
@@ -157,35 +158,78 @@ export function calculateFlags(x: number): number[] {
 
 function getStyleCommand(style: number): string {
   switch (style) {
-    case Style.Bold:
+    case xdom.Style.Bold:
       return 'textbf';
-    case Style.Italic:
+    case xdom.Style.Italic:
       return 'textit';
-    case Style.Underline:
+    case xdom.Style.Underline:
       return 'underline';
-    case Style.Subscript:
+    case xdom.Style.Subscript:
       return 'textsubscript';
-    case Style.Superscript:
+    case xdom.Style.Superscript:
       return 'textsuperscript';
     default:
-      throw new Error('Invalid style: ' + style);
+      throw new Error(`Invalid style: ${style}`);
   }
 }
 
-export function stringifyXNodes(nodes: XNode[]): string {
+function renderXContainer(node: xdom.XContainer): string {
+  return stringifyXNodes(node.childNodes) + node.labels.map(label => t('label', label)).join('');
+}
+
+export function renderXNode(node: xdom.XNode): string {
+  if (xdom.isXText(node)) {
+    // normally, this won't be called
+    throw new Error('Cannot call XText#toLaTeX(); use latex.stringifyXTexts() instead');
+  }
+  else if (xdom.isXReference(node)) {
+    return t('Cref', node.code);
+  }
+  else if (xdom.isXTextContainer(node)) {
+    return stringifyXTexts(node.xTexts);
+  }
+  else if (xdom.isXNamedContainer(node)) {
+    // Handles Section, Subsection, and Subsubsection
+    return t(node.name, stringifyXNodes(node.childNodes)) + node.labels.map(label => t('label', label)).join('');
+  }
+  else if (xdom.isXExample(node)) {
+    return `\\begin{exe}\n  \\ex ${renderXContainer(node)}\n\\end{exe}`;
+  }
+  else if (xdom.isXFootnote(node)) {
+    // a lot of people like to add space in front of all their footnotes.
+    // this is kind of a hack to remove it.
+    const contents = renderXContainer(node).replace(/^\s+/, '');
+    return t('footnote', contents);
+  }
+  else if (xdom.isXEndnote(node)) {
+    // same preceding-space hack for endnotes
+    const contents = renderXContainer(node).replace(/^\s+/, '');
+    return t('endnote', contents);
+  }
+  // lower priority general case:
+  else if (xdom.isXContainer(node)) {
+    return renderXContainer(node);
+  }
+  else {
+    // throw new Error('Cannot call .toLaTeX() on abstract class "XNode"');
+    throw new Error('Cannot render abstract class "XNode"');
+  }
+}
+
+function stringifyXNodes(nodes: xdom.XNode[]): string {
   // first step is to loop through the nodes, grouping contiguous XText nodes into `xTextContainer`
-  const grouped_nodes: XNode[] = [];
+  const grouped_nodes: xdom.XNode[] = [];
   nodes.forEach(node => {
-    if (node instanceof XText) {
+    if (node instanceof xdom.XText) {
       // avoid using a buffer by checking for a current XTextContainer and
       // adding one if needed
       const last_grouped_node = grouped_nodes[grouped_nodes.length - 1];
-      let xTextContainer: XTextContainer;
-      if (last_grouped_node instanceof XTextContainer) {
+      let xTextContainer: xdom.XTextContainer;
+      if (last_grouped_node instanceof xdom.XTextContainer) {
         xTextContainer = last_grouped_node;
       }
       else {
-        xTextContainer = new XTextContainer();
+        xTextContainer = new xdom.XTextContainer();
         grouped_nodes.push(xTextContainer);
       }
       xTextContainer.xTexts.push(node);
@@ -196,8 +240,8 @@ export function stringifyXNodes(nodes: XNode[]): string {
   });
 
   // return this.childNodes.map(childNode => childNode.toLaTeX()).join('');
-  return join(grouped_nodes, node => node.toLaTeX(), (left, right) => {
-    if (left instanceof XContainer && right instanceof XContainer) {
+  return join(grouped_nodes, renderXNode, (left, right) => {
+    if (left instanceof xdom.XContainer && right instanceof xdom.XContainer) {
       return '\n\n';
     }
     return '';
@@ -256,7 +300,7 @@ function findParentTeXNode(parent: TeXNode, searchChild: TeXNode): TeXNode {
 Take a list of XText spans, optimize the ordering of the styles, and join all
 of the text together into a single string.
 */
-export function stringifyXTexts(nodes: XText[]): string {
+function stringifyXTexts(nodes: xdom.XText[]): string {
   // split off all hanging whitespace so that we can deal with it separately
   // from the contentful spans
   const queue = flatMap(nodes, xText => {
@@ -265,7 +309,7 @@ export function stringifyXTexts(nodes: XText[]): string {
     const [, left, middle, right] = hanging_whitespace_match;
     // left and/or right might be undefined
     xText.data = middle;
-    return [...(left ? [new XText(left)] : []), xText, ...(right ? [new XText(right)] : [])]
+    return [...(left ? [new xdom.XText(left)] : []), xText, ...(right ? [new xdom.XText(right)] : [])]
   });
 
   let whitespace_buffer: string = '';

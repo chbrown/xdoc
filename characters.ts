@@ -1,6 +1,6 @@
 // unicode character equivalents in the Symbol font
 // thanks to http://en.wikipedia.org/wiki/Symbol_%28typeface%29
-export var symbol = {
+export const symbol = {
   33: '!',
   34: '∀',
   35: '#',
@@ -193,7 +193,7 @@ export var symbol = {
 };
 
 // thanks to http://www.alanwood.net/demos/wingdings.html
-export var wingdings = {
+export const wingdings = {
   33: '✏',
   34: '✂',
   35: '✁',

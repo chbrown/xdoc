@@ -1,6 +1,7 @@
 BIN := node_modules/.bin
 TYPESCRIPT := $(shell jq -r '.files[]' tsconfig.json | grep -Fv .d.ts)
-JAVASCRIPT := $(TYPESCRIPT:%.ts=%.js)
+TYPESCRIPT_BASENAMES := $(basename $(TYPESCRIPT))
+JAVASCRIPT := $(TYPESCRIPT_BASENAMES:%=%.js)
 
 all: $(JAVASCRIPT) build/bundle.js .gitignore .npmignore
 
@@ -10,11 +11,14 @@ $(BIN)/tsc $(BIN)/webpack $(BIN)/mocha:
 %.js: %.ts $(BIN)/tsc
 	$(BIN)/tsc
 
+%.js: %.tsx $(BIN)/tsc
+	$(BIN)/tsc
+
 .npmignore: tsconfig.json
 	echo $(TYPESCRIPT) tests/ Makefile tsconfig.json | tr ' ' '\n' > $@
 
 .gitignore: tsconfig.json
-	echo $(JAVASCRIPT) $(TYPESCRIPT:%.ts=%.d.ts) | tr ' ' '\n' > $@
+	echo $(JAVASCRIPT) $(TYPESCRIPT_BASENAMES:%=%.d.ts) | tr ' ' '\n' > $@
 
 build/bundle.js: webpack.config.js $(JAVASCRIPT) $(BIN)/webpack
 	@mkdir -p $(@D)

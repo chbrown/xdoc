@@ -1,5 +1,8 @@
+components/DateTime.tsx
+components/FixedNav.tsx
+components/XNode.tsx
 formats/docx.ts
-app.ts
+app.tsx
 characters.ts
 latex.ts
 layouts.ts
