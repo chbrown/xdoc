@@ -151,11 +151,13 @@ class Documents extends React.Component<{}, DocumentsState> {
     reader.readAsArrayBuffer(file);
   }
   render() {
+    // webpack inline-replaces the (compiled) RHS of this assignment to the version string.
+    const version = (window as any).XDOC_VERSION;
     const {storedFiles} = this.state;
     return (
       <div>
         <section className="hpad">
-          <h1><code>xdoc</code>: a Word-to-LaTeX converter.</h1>
+          <h1><code>xdoc</code>: a Word-to-LaTeX converter. v{version}</h1>
           <h3>Instructions:</h3>
           <ol>
             <li>Load a Word document file using the input below. This file is only

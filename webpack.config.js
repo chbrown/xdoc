@@ -1,5 +1,6 @@
 const path = require('path');
 const webpack = require('webpack');
+const packageMetadata = require('./package.json');
 
 const env = process.env.NODE_ENV || 'development';
 
@@ -12,6 +13,7 @@ module.exports = {
   plugins: [
     new webpack.DefinePlugin({
       'process.env.NODE_ENV': JSON.stringify(env),
+      'window.XDOC_VERSION': JSON.stringify(packageMetadata.version),
     }),
     new webpack.optimize.OccurenceOrderPlugin(),
     ...(env === 'production' ? [
@@ -30,10 +32,6 @@ module.exports = {
       {
         test: /\.less$/,
         loaders: ['style-loader', 'css-loader', 'less-loader'],
-      },
-      {
-        test: /\.json$/,
-        loaders: ['json-loader'],
       },
     ],
   },

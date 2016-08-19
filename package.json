@@ -33,7 +33,6 @@
     "babel-preset-es2015": "*",
     "css-loader": "*",
     "declarations": "*",
-    "json-loader": "*",
     "less": "*",
     "less-loader": "*",
     "mocha": "*",
