@@ -11,7 +11,6 @@
     "node_modules/declarations/react/react-dom.d.ts",
     "node_modules/declarations/react-router/history.d.ts",
     "node_modules/declarations/react-router/react-router.d.ts",
-    "shims.d.ts",
     "components/DateTime.tsx",
     "components/FixedNav.tsx",
     "components/XNode.tsx",
