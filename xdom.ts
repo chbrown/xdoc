@@ -42,12 +42,9 @@ export class XText extends XNode {
   }
 }
 
-export class XTextContainer extends XNode {
-  constructor(public xTexts: XText[] = []) { super() }
-}
-
 export class XReference extends XNode {
-  constructor(public code: string, public childNodes: XNode[] = []) { super() }
+  constructor(public code: string,
+              public childNodes: XNode[] = []) { super() }
 
   toJSON() {
     return {
@@ -66,8 +63,8 @@ Paragraphs can only have XElements (and subclasses) as children, never naked
 XOldText nodes.
 */
 export class XContainer extends XNode {
-  labels: string[] = [];
-  constructor(public childNodes: XNode[] = []) { super() }
+  constructor(public childNodes: XNode[] = [],
+              public labels: string[] = []) { super() }
 
   appendChild(newChild: XNode) {
     this.childNodes.push(newChild);
@@ -137,9 +134,6 @@ export class XEndnote extends XContainer {
 
 export function isXText(node: XNode): node is XText {
   return node instanceof XText;
-}
-export function isXTextContainer(node: XNode): node is XTextContainer {
-  return node instanceof XTextContainer;
 }
 export function isXReference(node: XNode): node is XReference {
   return node instanceof XReference;

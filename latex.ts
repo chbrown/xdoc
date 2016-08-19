@@ -3,7 +3,6 @@ import {Stack} from 'adts';
 
 import {escapeRegExp, isWhitespace, join} from './util';
 import * as xdom from './xdom';
-// import {Style, XNode, XText, XTextContainer, XContainer} from './xdom';
 
 const replacements = {
   // these need to be first!
@@ -175,24 +174,64 @@ function getStyleCommand(style: number): string {
   }
 }
 
+function groupXNodeList(nodes: xdom.XNode[]): xdom.XNode[] {
+  // loop through the nodes, grouping contiguous XText nodes into `xTextContainer`
+  const groups: xdom.XNode[] = [];
+  nodes.forEach(node => {
+    if (node instanceof xdom.XText) {
+      // avoid using a buffer by checking for a current XTextContainer and
+      // adding one if needed
+      const lastGroup = groups[groups.length - 1];
+      let xTextContainer: XTextContainer;
+      if (lastGroup instanceof XTextContainer) {
+        xTextContainer = lastGroup;
+      }
+      else {
+        xTextContainer = new XTextContainer();
+        groups.push(xTextContainer);
+      }
+      xTextContainer.xTexts.push(node);
+    }
+    else {
+      groups.push(node);
+    }
+  });
+  return groups;
+}
+
+class XTextContainer extends xdom.XNode {
+  constructor(public xTexts: xdom.XText[] = []) { super() }
+}
+
 function renderXContainer(node: xdom.XContainer): string {
-  return stringifyXNodes(node.childNodes) + node.labels.map(label => t('label', label)).join('');
+  return renderXNodeList(node.childNodes) + node.labels.map(label => t('label', label)).join('');
+}
+
+function renderXNodeList(nodes: xdom.XNode[]): string {
+  const groups = groupXNodeList(nodes);
+  return join(groups, renderXNode, (left, right) => {
+    if (left instanceof xdom.XContainer && right instanceof xdom.XContainer) {
+      return '\n\n';
+    }
+    return '';
+  });
 }
 
 export function renderXNode(node: xdom.XNode): string {
   if (xdom.isXText(node)) {
     // normally, this won't be called
-    throw new Error('Cannot call XText#toLaTeX(); use latex.stringifyXTexts() instead');
+    console.warn('Unusual call to renderXNode with XText node');
+    return node.data;
   }
   else if (xdom.isXReference(node)) {
     return t('Cref', node.code);
   }
-  else if (xdom.isXTextContainer(node)) {
-    return stringifyXTexts(node.xTexts);
+  else if (node instanceof XTextContainer) {
+    return renderXTextList(node.xTexts);
   }
   else if (xdom.isXNamedContainer(node)) {
     // Handles Section, Subsection, and Subsubsection, among others
-    return t(node.name, stringifyXNodes(node.childNodes)) + node.labels.map(label => t('label', label)).join('');
+    return t(node.name, renderXNodeList(node.childNodes)) + node.labels.map(label => t('label', label)).join('');
   }
   else if (xdom.isXExample(node)) {
     return `\\begin{exe}\n  \\ex ${renderXContainer(node)}\n\\end{exe}`;
@@ -216,38 +255,6 @@ export function renderXNode(node: xdom.XNode): string {
     // throw new Error('Cannot call .toLaTeX() on abstract class "XNode"');
     throw new Error('Cannot render abstract class "XNode"');
   }
-}
-
-function stringifyXNodes(nodes: xdom.XNode[]): string {
-  // first step is to loop through the nodes, grouping contiguous XText nodes into `xTextContainer`
-  const grouped_nodes: xdom.XNode[] = [];
-  nodes.forEach(node => {
-    if (node instanceof xdom.XText) {
-      // avoid using a buffer by checking for a current XTextContainer and
-      // adding one if needed
-      const last_grouped_node = grouped_nodes[grouped_nodes.length - 1];
-      let xTextContainer: xdom.XTextContainer;
-      if (last_grouped_node instanceof xdom.XTextContainer) {
-        xTextContainer = last_grouped_node;
-      }
-      else {
-        xTextContainer = new xdom.XTextContainer();
-        grouped_nodes.push(xTextContainer);
-      }
-      xTextContainer.xTexts.push(node);
-    }
-    else {
-      grouped_nodes.push(node);
-    }
-  });
-
-  // return this.childNodes.map(childNode => childNode.toLaTeX()).join('');
-  return join(grouped_nodes, renderXNode, (left, right) => {
-    if (left instanceof xdom.XContainer && right instanceof xdom.XContainer) {
-      return '\n\n';
-    }
-    return '';
-  });
 }
 
 class TeXString {
@@ -305,7 +312,7 @@ function findParentTeXNode(parent: TeXNode, searchChild: TeXNode): TeXNode {
 Take a list of XText spans, optimize the ordering of the styles, and join all
 of the text together into a single string.
 */
-function stringifyXTexts(nodes: xdom.XText[]): string {
+function renderXTextList(nodes: xdom.XText[]): string {
   // split off all hanging whitespace so that we can deal with it separately
   // from the contentful spans
   const queue: xdom.XText[] = [];
