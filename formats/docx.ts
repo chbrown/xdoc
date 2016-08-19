@@ -6,7 +6,7 @@ This is the part that needs to worry about the difference between w:p and w:r
 import * as JSZip from 'jszip';
 import {Stack} from 'adts';
 import * as xdom from '../xdom';
-import {symbol, wingdings} from '../characters';
+import {symbol, wingdings} from './characters';
 import {memoize} from '../util';
 
 interface Map<V> { [index: string]: V }
@@ -121,7 +121,7 @@ function readParagraph(paragraph_element: Element, context: Context, parser: Par
       const pStyle = child.querySelector('pStyle');
       if (pStyle) {
         const pStyle_val = pStyle.getAttribute('w:val');
-        if (pStyle_val == 'ListNumber') {
+        if (pStyle_val == 'ListNumber' || pStyle_val == 'Example') {
           paragraph = new xdom.XExample(paragraph.childNodes);
         }
         else if (pStyle_val == 'Heading1') {
@@ -149,7 +149,6 @@ function readParagraph(paragraph_element: Element, context: Context, parser: Par
       else {
         paragraph.appendChildren(nodes);
       }
-
     }
     else if (tag == 'hyperlink') {
       // hyperlinks are just wrappers around a single w:r that contains a w:t.
@@ -184,10 +183,8 @@ function readParagraph(paragraph_element: Element, context: Context, parser: Par
       // (this is kind of a hack)
       //console.info('reading bookmark', id, name);
 
-      // if (paragraph instanceof xdom.XExample) {
       const code = name.replace(/[^A-Z0-9-]/gi, '');
       paragraph.labels.push(code);
-      // }
     }
     else if (tag == 'bookmarkEnd') {
       // hopefully bookmarks aren't cross-nested?
