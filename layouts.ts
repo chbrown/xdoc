@@ -12,12 +12,9 @@ export function plain(document: XDocument) {
 \\usepackage{fixltx2e}
 \\usepackage{times}
 
+\\newcommand{\\tab}{\\hspace{4em}}
+
 \\usepackage{gb4e}
-\\newcommand{\\example}[1]{
-  \\begin{exe}
-    \\ex{#1}
-  \\end{exe}
-}
 
 \\usepackage{cleveref}
 \\crefformat{xnumi}{(#2#1#3)}
@@ -73,6 +70,8 @@ export function semprag(document: XDocument) {
   return `\\documentclass[lucida,biblatex]{sp}
 
 % Converted by xdoc on ${timestamp}
+
+\\newcommand{\\tab}{\\hspace{4em}}
 
 \\usepackage{gb4e-emulate}
 

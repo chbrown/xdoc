@@ -100,7 +100,7 @@ const replacements = {
 
   '◊': '$\\lozenge$',
 
-  '\t': '\\hspace{4em}',
+  '\t': '\\tab{}',
   '⇐': '$\\Leftarrow$',
   '⇔': '$\\Leftrightarrow$',
   '⇒': '$\\Rightarrow$',
