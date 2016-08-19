@@ -162,8 +162,7 @@ class Documents extends React.Component<{}, DocumentsState> {
             <li>Preview the automatically generated <code>xdoc</code> representation
               of your document using the "XDoc" link.</li>
             <li>Generate a LaTeX representation via the "LaTeX" link. Copy and paste the
-              contents of that page into a file on your computer, and render it with
-              <code>pdflatex</code>.</li>
+              contents of that page into a file on your computer, and render it with <code>pdflatex</code>.</li>
           </ol>
           <p>Only modern Word documents (those with a <code>.docx</code> extension) are supported.</p>
         </section>
@@ -416,7 +415,7 @@ class DocumentLaTeX extends React.Component<RouteProps, DocumentLaTeXState> {
 
     return (
       <div>
-        <section className="hpad">
+        <section className="hpad no-select">
           <label>
             <span><b>Layout</b></span>
             {' '}
