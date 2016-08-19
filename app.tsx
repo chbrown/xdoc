@@ -3,7 +3,8 @@ import * as JSZip from 'jszip';
 
 import * as React from 'react';
 import {render} from 'react-dom';
-import {Router, Route, IndexRoute, Link, browserHistory} from 'react-router';
+import {Router, Route, IndexRoute, Link, useRouterHistory} from 'react-router';
+import {createHashHistory} from 'history';
 
 import {XMLTree} from 'xmltree/react';
 
@@ -98,7 +99,7 @@ function loadDocument(name: string) {
 interface RouteProps {
   params: {
     name: string,
-    filepath?: string,
+    splat?: string,
   };
 }
 
@@ -165,6 +166,8 @@ class Documents extends React.Component<{}, DocumentsState> {
               contents of that page into a file on your computer, and render it with <code>pdflatex</code>.</li>
           </ol>
           <p>Only modern Word documents (those with a <code>.docx</code> extension) are supported.</p>
+          <p>If something breaks, try it again in Chrome.
+            If it's still broken, please <a href="https://github.com/chbrown/xdoc/issues/new">create an issue GitHub</a>.</p>
         </section>
 
         {storedFiles.length ?
@@ -187,9 +190,9 @@ class Documents extends React.Component<{}, DocumentsState> {
               <tbody>
                 {storedFiles.map(storedFile =>
                   <tr key={storedFile.name}>
-                    <td><Link to={`${storedFile.name}/files`}>{storedFile.name}</Link></td>
-                    <td><Link to={`${storedFile.name}/xdoc`}>XDoc</Link></td>
-                    <td><Link to={`${storedFile.name}/latex`}>LaTeX</Link></td>
+                    <td><Link to={`/${storedFile.name}/files`}>{storedFile.name}</Link></td>
+                    <td><Link to={`/${storedFile.name}/xdoc`}>XDoc</Link></td>
+                    <td><Link to={`/${storedFile.name}/latex`}>LaTeX</Link></td>
                     {/*the storedFile.base64 getter should not trigger a base64 conversion*/}
                     <td className="number" title={`Base64 string length: ${storedFile.base64.length}`}>
                       {storedFile.size}
@@ -249,14 +252,15 @@ class Files extends React.Component<RouteProps, {}> {
     const storedFile = loadStoredFile(name);
     const zip = new JSZip(storedFile.arrayBuffer);
     // TODO: Fix jszip.d.ts
-    const files: {[index: string]: JSZipObject} = zip['files'];
+    const files = zip['files'];
+    const zipFiles: JSZipObject[] = Object.keys(files).map(fileName => files[fileName]);
     return (
       <div>
         <section className="hpad">
           <h3>Document zip archive contents</h3>
           <p>You can use this file to view the raw XML for all files inside the Word document.</p>
           <p>This is helpful for developing and debugging, but if you just want to convert your document,
-            use the <Link to="latex">LaTeX</Link> link.</p>
+            use the <Link to={`/${name}/latex`}>LaTeX</Link> link.</p>
         </section>
 
         <table className="fill padded lined striped">
@@ -270,13 +274,13 @@ class Files extends React.Component<RouteProps, {}> {
             </tr>
           </thead>
           <tbody>
-            {Object.keys(files).map((name: string) =>
-              <tr key={name}>
-                <td><Link to={`files/${name}`}>{name}</Link></td>
-                <td>{String(files[name].dir)}</td>
-                <td><DateTime date={files[name].date} /></td>
-                <td>{files[name].comment}</td>
-                <td>{files[name]['unixPermissions'] || files[name]['dosPermissions']}</td>
+            {zipFiles.map(zipFile =>
+              <tr key={zipFile.name}>
+                <td><Link to={`/${name}/files/${zipFile.name}`}>{zipFile.name}</Link></td>
+                <td>{String(zipFile.dir)}</td>
+                <td><DateTime date={zipFile.date} /></td>
+                <td>{zipFile.comment}</td>
+                <td>{zipFile['unixPermissions'] || zipFile['dosPermissions']}</td>
               </tr>
             )}
           </tbody>
@@ -300,7 +304,7 @@ const xmlTreeBlacklist = [
 
 class DocumentFilesXML extends React.Component<RouteProps, {}> {
   render() {
-    const {params: {name, filepath}} = this.props;
+    const {params: {name, splat: filepath}} = this.props;
     const storedFile = loadStoredFile(name);
     const zip = new JSZip(storedFile.arrayBuffer);
     const file = zip.file(filepath);
@@ -318,7 +322,7 @@ class DocumentFilesXML extends React.Component<RouteProps, {}> {
           </li>
           <li className="start">Start Tag</li>
           <li className="end">End Tag</li>
-          <li className="text" style="margin: 0">Text</li>
+          <li className="text" style={{margin: 0}}>Text</li>
         </ul>
 
         <h3>File: {file.name}</h3>
@@ -461,13 +465,18 @@ class NotFound extends React.Component<{}, {}> {
   }
 }
 
+// hashHistory directly from react-router sets ugly ?_k= on all URLs;
+// this is the recommended/only work-around
+const appHistory = useRouterHistory(createHashHistory)({queryKey: false});
+
+// we have to use hashHistory since we have no control over the root on gh-pages
 const router = (
-  <Router history={browserHistory}>
+  <Router history={appHistory}>
     <Route path="/" component={App}>
       <IndexRoute component={Documents} />
       <Route path=":name" component={Document}>
         <Route path="files" component={Files}>
-          <Route path=":filepath/xml" component={DocumentFilesXML} />
+          <Route path="*" component={DocumentFilesXML} />
         </Route>
         <Route path="xdoc" component={DocumentXDoc} />
         <Route path="xdocjson" component={DocumentXDocJSON} />

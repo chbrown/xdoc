@@ -19,6 +19,7 @@
   "dependencies": {
     "adts": "*",
     "coders": "*",
+    "history": "^2.1.2",
     "jszip": "^2.6.1",
     "react": "*",
     "react-dom": "*",
