@@ -66,6 +66,8 @@ const replacements = {
   '⊆': '$\\subseteq$', // U+2286 SUBSET OF OR EQUAL TO
   '⊇': '$\\supseteq$',
   '≥': '$\\ge$',
+  '×': '$\\times$',
+  '∪': '$\\cup$',
 
   '‘': '`',
   '’': "'",
@@ -121,6 +123,7 @@ const replacements = {
 
   // ascii symbols (not really a LaTeX issue)
   '==>': '$\\Rightarrow$',
+  '=>': '$\\Rightarrow$',
   '||': '\\textbardbl{}',
 
   // MS Word being so helpful
@@ -188,7 +191,7 @@ export function renderXNode(node: xdom.XNode): string {
     return stringifyXTexts(node.xTexts);
   }
   else if (xdom.isXNamedContainer(node)) {
-    // Handles Section, Subsection, and Subsubsection
+    // Handles Section, Subsection, and Subsubsection, among others
     return t(node.name, stringifyXNodes(node.childNodes)) + node.labels.map(label => t('label', label)).join('');
   }
   else if (xdom.isXExample(node)) {
@@ -258,6 +261,9 @@ class TeXString {
       const pt = match.length * 3;
       return `\\underline{\\hspace{${pt}pt}}`;
     });
+    // 2. fix quotes for reasonably-sized strings (up to 200 characters)
+    tex = tex.replace(/(^|\(|\[| )'(\S[^']{1,200}\S)'($|\.|,|;|\?|\)|\]| )/g, "$1`$2'$3");
+    tex = tex.replace(/(^|\(|\[| )"(\S[^"]{1,200}\S)"($|\.|,|;|\?|\)|\]| )/g, "$1``$2''$3");
     return tex;
   }
 }
