@@ -7,7 +7,7 @@ import * as JSZip from 'jszip';
 import {Stack} from 'adts';
 import * as xdom from '../xdom';
 import {symbol, wingdings} from './characters';
-import {memoize} from '../util';
+import {isElement, memoize} from '../util';
 
 interface Map<V> { [index: string]: V }
 
@@ -156,9 +156,10 @@ body will most often be a <w:body> element, but may also be a
 The returned node's .childNodes will be xdom.XParagraph objects.
 */
 function readBody(body: Element, context: Context, parser: Parser): xdom.XContainer[] {
-  return Array.from(body.childNodes)
-    .filter(childNode => childNode.nodeType == Node.ELEMENT_NODE)
-    .map((element: Element) => readParagraph(element, context, parser));
+  const nodes = Array.from(body.childNodes);
+  // TODO: file issue on TypeScript not inferring result of filtering with user-defined type guard function
+  const elements = nodes.filter(isElement) as Element[];
+  return elements.map(element => readParagraph(element, context, parser));
 }
 
 /**
@@ -329,8 +330,13 @@ function readRun(run: Element, context: Context, parser: Parser): xdom.XNode[] {
 
       // Since we are inside fldChar boundaries, we are guaranteed to have a
       // Field on the context.fieldStack
-      const text = child.textContent;
-      context.fieldStack.top.instrTexts.push(text);
+      const field = context.fieldStack.top;
+      if (field) {
+        field.instrTexts.push(child.textContent);
+      }
+      else {
+        console.error(`Encountered instrText "${child.textContent}" without available Field while reading run:`, run);
+      }
       // console.info('r > instrText:', child);
     }
     else if (tag == 'fldChar') {

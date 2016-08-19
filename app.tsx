@@ -169,6 +169,11 @@ class Documents extends React.Component<{}, DocumentsState> {
               contents of that page into a file on your computer, and render it with <code>pdflatex</code>.</li>
           </ol>
           <p>Only modern Word documents (those with a <code>.docx</code> extension) are supported.</p>
+          <b>Common issues:</b>
+          <ul>
+            <li>You will probably need to remove all review markup and comments in Word</li>
+            <li>LaTeX can't handle footnotes inside section headings, so you may need to manually move those outside the heading command</li>
+          </ul>
           <p>If something breaks, try it again in Chrome.
             If it's still broken, please <a href="https://github.com/chbrown/xdoc/issues/new">create an issue GitHub</a>.</p>
         </section>

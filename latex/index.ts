@@ -113,7 +113,7 @@ export function renderXNode(node: XNodeGroup): string {
     return t('Cref', cleanMarker(node.code));
   }
   else if (xdom.isXExample(node)) {
-    return `\\begin{exe}\n  \\ex ${renderXContainer(node)}\n\\end{exe}`;
+    return `\\begin{exe}\n  \\ex{${renderXContainer(node)}}\n\\end{exe}`;
   }
   else if (xdom.isXFootnote(node)) {
     // a lot of people like to add space in front of all their footnotes.
