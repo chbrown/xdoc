@@ -1,5 +1,5 @@
-import {XDocument} from './xdom';
-import {renderXNode} from './latex';
+import {XDocument} from '../xdom';
+import {renderXNode} from './index';
 
 export function plain(document: XDocument) {
   const timestamp = new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '');

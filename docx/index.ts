@@ -11,13 +11,31 @@ import {memoize} from '../util';
 
 interface Map<V> { [index: string]: V }
 
-class ComplexField {
-  /** `separated` is set to true when w:fldChar[fldCharType="separate"] is reached. */
-  separated = false;
-  /** `code` is set to the value of a <w:instrText> that contains a 'REF ...' value. */
-  code: string;
-  /** `childNodes` is a container of the nodes between the "separate" and the "end" markers */
-  constructor(public childNodes: xdom.XNode[] = []) { }
+/**
+A Field is delimited by fldChar elements. A Field is usually some kind of
+in-document reference that has both a prefix instruction (between the 'begin'
+and 'separate' fldCharTypes, indicated as instrText element contents) that
+points to some unique variable, and a postfix (specified between the 'separate'
+and 'end' fldCharTypes) that indicates the textual content of the field (the
+current displayed value).
+*/
+interface Field {
+  /** list of the instructions between the "begin" and the "separate" markers */
+  instrTexts: string[];
+  /** starts as false and is set to true when fldChar[fldCharType="separate"] is reached. */
+  separated: boolean;
+  /** container of the nodes between the "separate" and the "end" markers */
+  children: xdom.XNode[];
+}
+
+class Context {
+  fieldStack = new Stack<Field>();
+  stylesStack = new Stack<number>();
+
+  /** Combines all styles in the stack */
+  currentStyles(): number {
+    return this.stylesStack.getElements().reduce((a, b) => a | b, 0);
+  }
 }
 
 function childElements(node: Node): Element[] {
@@ -43,6 +61,47 @@ Drop the namespace part of a fully qualified name, e.g.:
 */
 function dropNS(qualifiedName: string) {
   return qualifiedName.replace(/^.+:/, '');
+}
+
+/**
+Parse a instrText string sequence.
+
+- hyperlinks look like:
+  ' HYPERLINK "http://dx.doi.org/10.1018/s11932-003-7165-1" \t "_blank" '
+- list references look like:
+  ' REF _Ref226606793 \r \h '
+- footnote references look like:
+  ' NOTEREF _Ref226606793 \h '
+- page references look like:
+  ' PAGEREF _Toc297721081 \h '
+- counters look like:
+  ' LISTNUM  ' or ' LISTNUM Example '
+  but I think they refer to the same thing
+
+I'm not sure what the ' \* MERGEFORMAT ' instructions are for
+*/
+function readInstructionText(text: string): {ref?: string, flags?: string} {
+  const hyperlinkMatch = text.match(/ HYPERLINK "(.+)" \\t ".+"/);
+  if (hyperlinkMatch) {
+    console.warn(`Ignoring r > instrText hyperlink: "${hyperlinkMatch[1]}"`);
+    // context.addStyles(['hyperlink', 'url=' + hyperlinkMatch[1]]);
+    return {};
+  }
+
+  // (list) REF, NOTEREF, and PAGEREF can all be interpreted the same way
+  const refMatch = text.match(/^ (REF|NOTEREF|PAGEREF) (\S+) (.+) $/);
+  if (refMatch) {
+    const [, type, ref, flags] = refMatch;
+    return {ref, flags};
+  }
+
+  const counterMatch = text.match(/ LISTNUM (.*) $/);
+  if (counterMatch) {
+    console.info(`Ignoring r > instrText counter: "${counterMatch[1]}"`);
+    // context.addStyles(['counter', 'series=' + counterMatch[1]]);
+    return {};
+  }
+  return {};
 }
 
 /**
@@ -109,7 +168,7 @@ returns a single xdom.XNode, which will have a bunch of XNode children
 (which can then be joined based on style congruence)
 */
 function readParagraph(paragraph_element: Element, context: Context, parser: Parser): xdom.XContainer {
-  let paragraph: xdom.XContainer = new xdom.XContainer();
+  let paragraph: xdom.XContainer = {name: 'paragraph', children: [], labels: []};
   context.stylesStack.push(0);
 
   // we need to read w:p's children in a loop, because each w:p's is not a constituent
@@ -122,16 +181,16 @@ function readParagraph(paragraph_element: Element, context: Context, parser: Par
       if (pStyle) {
         const pStyle_val = pStyle.getAttribute('w:val');
         if (pStyle_val == 'ListNumber' || pStyle_val == 'Example') {
-          paragraph = new xdom.XExample(paragraph.childNodes);
+          paragraph = Object.assign(paragraph, {name: 'example'});
         }
         else if (pStyle_val == 'Heading1') {
-          paragraph = new xdom.XSection(paragraph.childNodes);
+          paragraph = Object.assign(paragraph, {name: 'section'});
         }
         else if (pStyle_val == 'Heading2') {
-          paragraph = new xdom.XSubsection(paragraph.childNodes);
+          paragraph = Object.assign(paragraph, {name: 'subsection'});
         }
         else if (pStyle_val == 'Heading3') {
-          paragraph = new xdom.XSubsubsection(paragraph.childNodes);
+          paragraph = Object.assign(paragraph, {name: 'subsubsection'});
         }
         else {
           console.warn('ignoring pPr > pStyle', pStyle_val);
@@ -141,13 +200,14 @@ function readParagraph(paragraph_element: Element, context: Context, parser: Par
     else if (tag == 'r') {
       // readRun will most often return a list of only one node
       const nodes = readRun(child, context, parser);
-      // if we are within a complex field stack, we append to that rather than the current paragraph
-      if (context.complexFieldStack.top) {
-        // by the time we get to runs inside a complexField, `context.complexFieldStack.top.separated` should be true
-        context.complexFieldStack.top.childNodes.push(...nodes);
+      // if we are within a field stack, we append to that rather than the current paragraph
+      if (context.fieldStack.top) {
+        // by the time we get to text runs inside a field, `context.fieldStack.top.separated` should be true
+        context.fieldStack.top.children.push(...nodes);
       }
       else {
-        paragraph.appendChildren(nodes);
+        // paragraph = Object.assign(paragraph, {children: [...paragraph.children, ...nodes]});
+        paragraph.children.push(...nodes);
       }
     }
     else if (tag == 'hyperlink') {
@@ -156,7 +216,10 @@ function readParagraph(paragraph_element: Element, context: Context, parser: Par
       // but for now I just read the raw link
       // context.pushStyles(['hyperlink']);
       childElements(child).forEach(hyperlink_child => {
-        readRun(hyperlink_child, context, parser).forEach(node => paragraph.appendChild(node));
+        readRun(hyperlink_child, context, parser).forEach(node => {
+          // paragraph = Object.assign(paragraph, {children: [...paragraph.children, node]});
+          paragraph.children.push(node);
+        });
       });
       // context.popStyles();
     }
@@ -183,7 +246,7 @@ function readParagraph(paragraph_element: Element, context: Context, parser: Par
       // (this is kind of a hack)
       //console.info('reading bookmark', id, name);
 
-      const code = name.replace(/[^A-Z0-9-]/gi, '');
+      const code = name;
       paragraph.labels.push(code);
     }
     else if (tag == 'bookmarkEnd') {
@@ -204,7 +267,7 @@ Read the contents of a single w:r element (`run`) as a list of XNodes
 
 context is the mutable state Context object.
 */
-function readRun(run: Element, context: Context, parser: Parser): xdom.XNode[] { // xdom.XText | xdom.XFootnote | xdom.XFootnote
+function readRun(run: Element, context: Context, parser: Parser): xdom.XNode[] {
   const nodes: xdom.XNode[] = [];
 
   context.stylesStack.push(0);
@@ -250,77 +313,55 @@ function readRun(run: Element, context: Context, parser: Parser): xdom.XNode[] {
         // replacement = `MISSING SYMBOL (${char})`
         text = shifted_char_code; // symbol_map.get(sym_char)
       }
-
-      const sym_node = new xdom.XText(text, context.currentStyles());
-      nodes.push(sym_node);
+      nodes.push({data: text, styles: context.currentStyles()});
     }
     else if (tag == 't') {
-      const t_node = new xdom.XText(child.textContent, context.currentStyles());
-      nodes.push(t_node);
+      nodes.push({data: child.textContent, styles: context.currentStyles()});
     }
     else if (tag == 'tab') {
-      const tab_node = new xdom.XText('\t', context.currentStyles());
-      nodes.push(tab_node);
+      nodes.push({data: '\t', styles: context.currentStyles()});
     }
     else if (tag == 'instrText') {
-      // hyperlinks look like this:
-      // ' HYPERLINK "http://dx.doi.org/10.1018/s11932-003-7165-1" \t "_blank" '
-      // references look like this:
-      // ' REF _Ref226606793 \r \h '
-      // counters look like this:
-      // ' LISTNUM  ' or ' LISTNUM Example ' but I think they refer to the same thing
-      // I'm not sure what the ' \* MERGEFORMAT ' instructions are for
-      // console.info('r > instrText:', child);
+      // <w:instrText> tags are found between <w:fldChar w:fldCharType="begin">
+      // and <w:fldChar w:fldCharType="separate" /> elements, but the actual
+      // instruction may be split between multiple instrText tags, so we must
+      // simply collect it first, and process after.
 
+      // Since we are inside fldChar boundaries, we are guaranteed to have a
+      // Field on the context.fieldStack
       const text = child.textContent;
-      const hyperlink_match = text.match(/ HYPERLINK "(.+)" \\t ".+"/);
-      if (hyperlink_match) {
-        console.warn(`Ignoring r > instrText hyperlink: "${hyperlink_match[1]}"`);
-        // context.addStyles(['hyperlink', 'url=' + hyperlink_match[1]]);
-      }
-
-      const ref_match = text.match(/^ REF (\S+) (.+) $/);
-      if (ref_match) {
-        const ref = ref_match[1];
-        const flags = ref_match[2];
-        // console.info(`Setting complex field code to "${ref}" (ignoring flags: ${flags})`);
-        // `context.complexFieldStateStack.top` should not be undefined, and
-        // `context.complexFieldStateStack.top.separated` should be false
-        context.complexFieldStack.top.code = ref;
-      }
-
-      const counter_match = text.match(/ LISTNUM (.*) $/);
-      if (counter_match) {
-        console.info(`Ignoring r > instrText counter: "${counter_match[1]}"`);
-        // context.addStyles(['counter', 'series=' + counter_match[1]]);
-      }
+      context.fieldStack.top.instrTexts.push(text);
+      // console.info('r > instrText:', child);
     }
     else if (tag == 'fldChar') {
-      // fldChar indicates a field character. The variable is specified between
-      // the 'begin' and 'separate' fldCharTypes (usually as instrText), and the
-      // current displayed value is specified between the 'separate' and 'end' types.
-      const field_signal = child.getAttribute('w:fldCharType');
-      if (field_signal == 'begin') {
+      // fldChar indicates a field-delimiter "character".
+      const fldCharType = child.getAttribute('w:fldCharType');
+      if (fldCharType == 'begin') {
         // console.info('r > fldChar: fldCharType=begin');
-        context.complexFieldStack.push(new ComplexField());
+        const field: Field = {instrTexts: [], separated: false, children: []};
+        context.fieldStack.push(field);
       }
-      else if (field_signal == 'separate') {
+      else if (fldCharType == 'separate') {
         // console.info('r > fldChar: fldCharType=separate');
-        context.complexFieldStack.top.separated = true;
+        context.fieldStack.top.separated = true;
       }
-      else if (field_signal == 'end') {
+      else if (fldCharType == 'end') {
         // console.info('r > fldChar: fldCharType=end');
-        const complexField = context.complexFieldStack.pop();
-        if (complexField) {
-          let field_node: xdom.XNode = new xdom.XContainer(complexField.childNodes);
-          if (complexField.code) {
-            const code = complexField.code.replace(/[^A-Z0-9-]/gi, '');
-            field_node = new xdom.XReference(code, complexField.childNodes);
+        const field = context.fieldStack.pop();
+        if (field) {
+          const instruction = field.instrTexts.join('');
+          const {ref, flags} = readInstructionText(instruction);
+          if (ref !== undefined && flags !== undefined) {
+            // console.info(`Setting field code to "${ref}" (ignoring flags: ${flags})`);
+            const reference: xdom.XReference = {name: 'reference', children: field.children, labels: [], code: ref};
+            nodes.push(reference);
           }
-          nodes.push(field_node);
+          else {
+            console.error(`Field instruction "${instruction}" cannot be interpreted as reference`);
+          }
         }
         else {
-          console.info(`Empty complexField encountered at:`, child);
+          console.error('Reached field-end without a field on the stack');
         }
         // const change = child.find('{*}numberingChange');
         // let span;
@@ -331,12 +372,11 @@ function readRun(run: Element, context: Context, parser: Parser): xdom.XNode[] {
         // console.info('Found fldCharType=end; reverting p_styles and p_attrs');
       }
       else {
-        throw new Error(`r > fldChar: Unrecognized fldCharType: ${field_signal}`);
+        throw new Error(`r > fldChar: Unrecognized fldCharType: ${fldCharType}`);
       }
     }
     else if (tag == 'br') {
-      const break_node = new xdom.XText('\n', context.currentStyles());
-      nodes.push(break_node);
+      nodes.push({data: '\n', styles: context.currentStyles()});
     }
     else if (tag == 'separator') {
       // this denotes the horizontal line in footnotes
@@ -371,21 +411,10 @@ function readRun(run: Element, context: Context, parser: Parser): xdom.XNode[] {
   return nodes;
 }
 
-class Context {
-  complexFieldStack = new Stack<ComplexField>();
-  stylesStack = new Stack<number>();
-
-  /** Combines all styles in the stack */
-  currentStyles(): number {
-    return this.stylesStack.getElements().reduce((a, b) => a | b, 0);
-  }
-}
-
 export class Parser {
-  constructor(arraybuffer: ArrayBuffer,
-              public zip = new JSZip(arraybuffer)) { }
+  constructor(public zip: JSZip) { }
 
-  get document() {
+  get document(): xdom.XDocument {
     // the root element of the word/document.xml document is a w:document, which
     // should have one child element, w:body, whose children are a bunch of
     // <w:p> elements (paragraphs)
@@ -395,7 +424,7 @@ export class Parser {
       const context = new Context();
       return readParagraph(child, context, this);
     });
-    return new xdom.XDocument(this.metadata, children);
+    return {name: 'document', metadata: this.metadata, children, labels: []};
   }
 
   /**
@@ -415,8 +444,8 @@ export class Parser {
         const id = child.getAttribute('w:id');
         // each w:footnote has a bunch of w:p children, like a w:body
         const context = new Context();
-        const container_childNodes = readBody(child, context, this);
-        footnotes[id] = new xdom.XFootnote(container_childNodes);
+        const children = readBody(child, context, this);
+        footnotes[id] = {name: 'footnote', children, labels: []};
       });
     }
     return footnotes;
@@ -435,9 +464,9 @@ export class Parser {
       childElements(document.documentElement).forEach(child => {
         const id = child.getAttribute('w:id');
         const context = new Context();
-        const container_childNodes = readBody(child, context, this);
+        const children = readBody(child, context, this);
         // TODO: why does it compile if I use xdom.XFootnote below?
-        endnotes[id] = new xdom.XEndnote(container_childNodes);
+        endnotes[id] = {name: 'endnote', children, labels: []};
       });
     }
     return endnotes;

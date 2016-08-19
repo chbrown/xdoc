@@ -1,139 +1,9 @@
-// http://en.wikibooks.org/wiki/LaTeX/Special_Characters#Escaped_codes
 import {Stack} from 'adts';
 
-import {escapeRegExp, isWhitespace, join} from './util';
-import * as xdom from './xdom';
+import {isWhitespace, join} from '../util';
+import * as xdom from '../xdom';
 
-const replacements = {
-  // these need to be first!
-  '\\': '\\backslash{}',
-  '{': '\\{',
-  '}': '\\}',
-  '$': '\\$',
-  '#': '\\#',
-
-  // acute
-  'á': "\\'a",
-  'é': "\\'e",
-  'í': "\\'i",
-  'ó': "\\'o",
-  'ú': "\\'u",
-  // double acute
-  'ő': '\\H{o}',
-  'ű': '\\H{u}',
-  // grave
-  'ò': '\\`{o}',
-  // umlaut
-  'ö': '\\"o',
-  'ü': '\\"u',
-  // circumflex
-  'ô': '\\^{o}',
-  // breve
-  'ŏ': '\\u{o}',
-  // caron / hacek (little v)
-  'č': '\\v{c}',
-  // combining accents
-  '̈': '\\"', // diaeresis
-  '́': "\\'", // acute
-
-  'ø': '\\o',
-  'Ø': '\\O',
-
-  '∧': '$\\wedge$',
-  '∨': '$\\vee$',
-  '∀': '$\\forall$',
-  '': '$\\forall$',
-  '∃': '$\\exists$',
-  '': '$\\exists$',
-
-  '¬': '$\\neg$',
-  '≠': '$\\neq$',
-  '≤': '$\\leq$',
-  '': '$<$',
-  '<': '\\textless{}',
-  '>': '\\textgreater{}',
-
-  '∈': '$\\in$',
-  '': '$\\in$',
-  '∅': '$\\emptyset$',
-  '': '$\\cap$',
-  '−': '$-$', // 'MINUS SIGN' (U+2212)
-  '⊑': '$\\sqsubseteq$', // 'SQUARE IMAGE OF OR EQUAL TO' (U+2291)
-  '⊃': '$\\supset$',
-  '⊂': '$\\subset$',
-  '≡': '$\\equiv$',
-  '⊆': '$\\subseteq$', // U+2286 SUBSET OF OR EQUAL TO
-  '⊇': '$\\supseteq$',
-  '≥': '$\\ge$',
-  '×': '$\\times$',
-  '∪': '$\\cup$',
-
-  '‘': '`',
-  '’': "'",
-  '“': '``',
-  '”': "''",
-
-  '…': '\\dots{}',
-
-  // greek alphabet
-  'α': '$\\alpha$',
-  '': '$\\alpha$',
-  'λ': '$\\lambda$',
-  '': '$\\lambda$',
-  'δ': '$\\delta$',
-  'ε': '$\\epsilon$',
-  'ι': '$\\iota$',
-  'Π': '$\\Pi$',
-  'π': '$\\pi$',
-  'ϕ': '$\\phi$',
-  '': '$\\phi$',
-  'θ': '$\\theta$',
-  'Θ': '$\\Theta$',
-  'β': '$\\beta$',
-  '': '$\\beta$',
-  '': ' ',
-  '': '$\\pi$',
-  '': ',',
-  'µ': '$\\mu$',
-  'μ': '$\\mu$',
-  'τ': '$\\tau$',
-
-  '◊': '$\\lozenge$',
-
-  '\t': '\\tab{}',
-  '⇐': '$\\Leftarrow$',
-  '⇔': '$\\Leftrightarrow$',
-  '⇒': '$\\Rightarrow$',
-  '→': '$\\to$',
-
-  '&': '\\&',
-  '—': '---', // m-dash
-  '–': '--', // n-dash
-  '∞': '$\\infty$', // n-dash
-  '☐': '$\\square$',
-  '\xa0': '~', // non-breaking space
-  // ligatures
-  'ﬁ': 'fi',
-
-  '': '\\{',
-  '': '|',
-  '': '$>$',
-  '%': '\\%',
-
-  // ascii symbols (not really a LaTeX issue)
-  '==>': '$\\Rightarrow$',
-  '=>': '$\\Rightarrow$',
-  '||': '\\textbardbl{}',
-
-  // MS Word being so helpful
-  '\u200e': '', // U+200E LEFT-TO-RIGHT MARK
-};
-
-const replacementRegExp = new RegExp(Object.keys(replacements).map(escapeRegExp).join('|'), 'g');
-
-function applyReplacements(raw: string): string {
-  return raw.replace(replacementRegExp, match => replacements[match]);
-}
+import {applyReplacements} from './characters';
 
 function t(command: string, content: string): string {
   return `\\${command}{${content}}`;
@@ -174,23 +44,40 @@ function getStyleCommand(style: number): string {
   }
 }
 
-function groupXNodeList(nodes: xdom.XNode[]): xdom.XNode[] {
-  // loop through the nodes, grouping contiguous XText nodes into `xTextContainer`
-  const groups: xdom.XNode[] = [];
+type XNodeGroup = xdom.XNode | xdom.XText[];
+
+function isXTextGroup(node: XNodeGroup): node is xdom.XText[] {
+  return Array.isArray(node);
+}
+
+function isXContainer(node: XNodeGroup): node is xdom.XContainer {
+  return !isXTextGroup(node) && xdom.isXContainer(node);
+}
+
+/**
+Word like to prefix its markers (field codes) with _, but gb4e and gb4e-emulate
+choke on this due to the automath subscript handling
+*/
+function cleanMarker(marker: string): string {
+  return marker.replace(/[^A-Z0-9-]/gi, '');
+}
+
+/**
+Loop through the nodes, collecting each sequence of contiguous XText nodes into a XTextGroup.
+*/
+function groupXNodeList(nodes: xdom.XNode[]): XNodeGroup[] {
+  const groups: XNodeGroup[] = [];
   nodes.forEach(node => {
-    if (node instanceof xdom.XText) {
-      // avoid using a buffer by checking for a current XTextContainer and
-      // adding one if needed
+    // we're only concerned with grouping text nodes without line breaks
+    if (xdom.isXText(node) && node.data != '\n') {
+      // avoid using a buffer by checking for a current XTextContainer
       const lastGroup = groups[groups.length - 1];
-      let xTextContainer: XTextContainer;
-      if (lastGroup instanceof XTextContainer) {
-        xTextContainer = lastGroup;
+      const currentTextGroup = isXTextGroup(lastGroup) ? lastGroup : [];
+      // and it to the groups accumulator if it's indeed new
+      if (currentTextGroup !== lastGroup) {
+        groups.push(currentTextGroup);
       }
-      else {
-        xTextContainer = new XTextContainer();
-        groups.push(xTextContainer);
-      }
-      xTextContainer.xTexts.push(node);
+      currentTextGroup.push(node);
     }
     else {
       groups.push(node);
@@ -199,39 +86,31 @@ function groupXNodeList(nodes: xdom.XNode[]): xdom.XNode[] {
   return groups;
 }
 
-class XTextContainer extends xdom.XNode {
-  constructor(public xTexts: xdom.XText[] = []) { super() }
-}
-
 function renderXContainer(node: xdom.XContainer): string {
-  return renderXNodeList(node.childNodes) + node.labels.map(label => t('label', label)).join('');
+  return renderXNodeList(node.children) + node.labels.map(cleanMarker).map(label => t('label', label)).join('');
 }
 
 function renderXNodeList(nodes: xdom.XNode[]): string {
   const groups = groupXNodeList(nodes);
   return join(groups, renderXNode, (left, right) => {
-    if (left instanceof xdom.XContainer && right instanceof xdom.XContainer) {
+    if (isXContainer(left) && isXContainer(right)) {
       return '\n\n';
     }
     return '';
   });
 }
 
-export function renderXNode(node: xdom.XNode): string {
-  if (xdom.isXText(node)) {
-    // normally, this won't be called
-    console.warn('Unusual call to renderXNode with XText node');
+export function renderXNode(node: XNodeGroup): string {
+  if (isXTextGroup(node)) {
+    return renderXTextList(node);
+  }
+  else if (xdom.isXText(node)) {
+    // due to XText grouping, this will only be called on text nodes that
+    // contain newlines, which are not candidates for grouping
     return node.data;
   }
   else if (xdom.isXReference(node)) {
-    return t('Cref', node.code);
-  }
-  else if (node instanceof XTextContainer) {
-    return renderXTextList(node.xTexts);
-  }
-  else if (xdom.isXNamedContainer(node)) {
-    // Handles Section, Subsection, and Subsubsection, among others
-    return t(node.name, renderXNodeList(node.childNodes)) + node.labels.map(label => t('label', label)).join('');
+    return t('Cref', cleanMarker(node.code));
   }
   else if (xdom.isXExample(node)) {
     return `\\begin{exe}\n  \\ex ${renderXContainer(node)}\n\\end{exe}`;
@@ -249,7 +128,11 @@ export function renderXNode(node: xdom.XNode): string {
   }
   // lower priority general case:
   else if (xdom.isXContainer(node)) {
-    return renderXContainer(node);
+    // Handles Section, Subsection, and Subsubsection, among others
+    if (node.name == 'paragraph' || node.name == 'document') {
+      return renderXContainer(node);
+    }
+    return t(node.name, renderXNodeList(node.children)) + node.labels.map(cleanMarker).map(label => t('label', label)).join('');
   }
   else {
     // throw new Error('Cannot call .toLaTeX() on abstract class "XNode"');
@@ -320,7 +203,7 @@ function renderXTextList(nodes: xdom.XText[]): string {
     const m = xText.data.match(/^(\s+)?([\S\s]*?)(\s+)?$/);
     // m[1] (left) and/or m[3] (right) might be undefined
     if (m[1]) {
-      queue.push(new xdom.XText(m[1]));
+      queue.push({data: m[1], styles: 0});
     }
     // middle might be the empty string, in which case
     if (m[2]) {
@@ -328,11 +211,11 @@ function renderXTextList(nodes: xdom.XText[]): string {
       queue.push(xText);
     }
     if (m[3]) {
-      queue.push(new xdom.XText(m[3]));
+      queue.push({data: m[3], styles: 0});
     }
   });
 
-  let whitespace_buffer: string = '';
+  let whitespaceBuffer: string = '';
 
   // okay, now we need to take this flat list of styled nodes and arrange it into a tree of nested styles
   const tree = new TeXNode(null);
@@ -344,7 +227,7 @@ function renderXTextList(nodes: xdom.XText[]): string {
     const xText = queue.shift();
     // only-whitespace always counts as the same style; it's like it has wildcard styles
     if (isWhitespace(xText.data)) {
-      whitespace_buffer += xText.data;
+      whitespaceBuffer += xText.data;
     }
     else {
       // we might need to pop until we can add styles
@@ -357,9 +240,9 @@ function renderXTextList(nodes: xdom.XText[]): string {
       // okay, we're now at the lowest point we need to be to be able to
       // accommodate the new node by adding styles
       // this lowest point is precisely where we want to insert the whitespace buffer
-      if (whitespace_buffer) {
-        treeCursor.push(new TeXString(whitespace_buffer));
-        whitespace_buffer = '';
+      if (whitespaceBuffer) {
+        treeCursor.push(new TeXString(whitespaceBuffer));
+        whitespaceBuffer = '';
       }
 
       // find the styles to add to get from treeCursorStyles.top to xText.styles
@@ -380,9 +263,9 @@ function renderXTextList(nodes: xdom.XText[]): string {
   }
 
   // final flush
-  if (whitespace_buffer) {
-    treeCursor.push(new TeXString(whitespace_buffer));
-    whitespace_buffer = '';
+  if (whitespaceBuffer) {
+    treeCursor.push(new TeXString(whitespaceBuffer));
+    whitespaceBuffer = '';
   }
 
   // okay, now we serialize the command tree into a single string

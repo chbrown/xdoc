@@ -8,8 +8,8 @@ import {createHashHistory} from 'history';
 
 import {XMLTree} from 'xmltree/react';
 
-import {Parser} from './formats/docx';
-import * as layouts from './layouts';
+import {Parser} from './docx/index';
+import * as layouts from './latex/layouts';
 
 import DateTime from './components/DateTime';
 import FixedNav from './components/FixedNav';
@@ -92,7 +92,8 @@ function loadStoredFile(name: string) {
 }
 function loadDocument(name: string) {
   const storedFile = loadStoredFile(name);
-  const parser = new Parser(storedFile.arrayBuffer);
+  const zip = new JSZip(storedFile.arrayBuffer);
+  const parser = new Parser(zip);
   return parser.document;
 }
 

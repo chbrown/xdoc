@@ -1,11 +1,12 @@
 components/DateTime.tsx
 components/FixedNav.tsx
 components/XNode.tsx
-formats/characters.ts
-formats/docx.ts
+docx/characters.ts
+docx/index.ts
+latex/characters.ts
+latex/index.ts
+latex/layouts.ts
 app.tsx
-latex.ts
-layouts.ts
 util.ts
 xdom.ts
 tests/

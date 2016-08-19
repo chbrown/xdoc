@@ -15,26 +15,24 @@ class XNodeComponent extends React.Component<{node: xdom.XNode}, {}> {
       // properties['title'] = `labels=${node.labels.join(',')}`;
       return <div className="reference">code={node.code}</div>;
     }
-    else if (xdom.isXNamedContainer(node)) {
-      // Handles Section, Subsection, and Subsubsection
-      return <div className={node.name}>{node.childNodes.map(wrapXNode)}</div>;
-    }
     else if (xdom.isXExample(node)) {
       // TODO: figure out if className is something else sometimes too?
-      return <div className="example">{node.childNodes.map(wrapXNode)}</div>;
+      return <div className="example">{node.children.map(wrapXNode)}</div>;
     }
     else if (xdom.isXDocument(node)) {
-      return <div className="document">{node.childNodes.map(wrapXNode)}</div>;
+      return <div className="document">{node.children.map(wrapXNode)}</div>;
     }
     else if (xdom.isXFootnote(node)) {
-      return <div className="footnote">{node.childNodes.map(wrapXNode)}</div>;
+      return <div className="footnote">{node.children.map(wrapXNode)}</div>;
     }
     else if (xdom.isXEndnote(node)) {
-      return <div className="endnote">{node.childNodes.map(wrapXNode)}</div>;
+      return <div className="endnote">{node.children.map(wrapXNode)}</div>;
     }
     // lower priority general case:
     else if (xdom.isXContainer(node)) {
-      return <div className="container">{node.childNodes.map(wrapXNode)}</div>;
+      // Handles Section, Subsection, and Subsubsection
+      const className = node.name || 'container';
+      return <div className={className}>{node.children.map(wrapXNode)}</div>;
     }
     else {
       throw new Error('Cannot render abstract class "XNode"');
