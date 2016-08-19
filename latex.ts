@@ -1,5 +1,4 @@
 // http://en.wikibooks.org/wiki/LaTeX/Special_Characters#Escaped_codes
-import {flatMap} from 'tarry';
 import {Stack} from 'adts';
 
 import {escapeRegExp, isWhitespace, join} from './util';
@@ -303,13 +302,21 @@ of the text together into a single string.
 function stringifyXTexts(nodes: xdom.XText[]): string {
   // split off all hanging whitespace so that we can deal with it separately
   // from the contentful spans
-  const queue = flatMap(nodes, xText => {
-    const hanging_whitespace_match = xText.data.match(/^(\s+)?([\S\s]*?)(\s+)?$/);
-    // hanging_whitespace_match will match anything but the empty string
-    const [, left, middle, right] = hanging_whitespace_match;
-    // left and/or right might be undefined
-    xText.data = middle;
-    return [...(left ? [new xdom.XText(left)] : []), xText, ...(right ? [new xdom.XText(right)] : [])]
+  const queue: xdom.XText[] = [];
+  nodes.forEach(xText => {
+    const m = xText.data.match(/^(\s+)?([\S\s]*?)(\s+)?$/);
+    // m[1] (left) and/or m[3] (right) might be undefined
+    if (m[1]) {
+      queue.push(new xdom.XText(m[1]));
+    }
+    // middle might be the empty string, in which case
+    if (m[2]) {
+      xText.data = m[2];
+      queue.push(xText);
+    }
+    if (m[3]) {
+      queue.push(new xdom.XText(m[3]));
+    }
   });
 
   let whitespace_buffer: string = '';

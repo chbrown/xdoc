@@ -20,11 +20,9 @@
     "adts": "*",
     "coders": "*",
     "jszip": "^2.6.1",
-    "loge": "*",
     "react": "*",
     "react-dom": "*",
     "react-router": "*",
-    "tarry": "*",
     "tex": "*",
     "xmltree": "*"
   },
